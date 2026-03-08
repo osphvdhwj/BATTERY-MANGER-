@@ -64,6 +64,10 @@ dependencies {
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
     implementation("com.patrykandpatrick.vico:core:1.13.1")
 
+    // Jetpack Glance for modern widgets
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.0")
+
     // LSPosed API
     compileOnly("de.robv.android.xposed:api:82")
 }

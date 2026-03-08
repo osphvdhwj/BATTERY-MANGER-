@@ -5,6 +5,7 @@
 
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -23,6 +24,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Glance Widget Receiver -->
+        <receiver
+            android:name=".WellbeingWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/wellbeing_widget_info" />
+        </receiver>
+
+        <!-- Xposed Configuration -->
         <meta-data
             android:name="xposedmodule"
             android:value="true" />
