@@ -17,6 +17,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 
+// Vico Imports
+import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
+import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
+import com.patrykandpatrick.vico.compose.chart.Chart
+import com.patrykandpatrick.vico.compose.chart.column.columnChart
+import com.patrykandpatrick.vico.core.axis.AxisPosition
+import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
+import com.patrykandpatrick.vico.core.entry.ChartEntryModelProducer
+import com.patrykandpatrick.vico.core.entry.FloatEntry
+
 // 1. Create a data model for the parsed JSON
 data class BatteryStat(val title: String, val value1: Double, val value2: Double)
 
@@ -107,6 +117,58 @@ fun WellbeingDashboardScreen() {
     WellbeingDashboard(displayStats)
 }
 
+@Composable
+fun BatteryBarChart(batteryData: List<BatteryStat>) {
+    // 1. Sort and filter to get the top 5 highest drainers to keep the chart clean
+    val topDrainers = remember(batteryData) {
+        batteryData
+            .filter { it.value1 > 0 } // Only show items that actually drained power
+            .sortedByDescending { it.value1 }
+            .take(5)
+    }
+
+    // 2. Map the data into Vico's FloatEntry format
+    val chartEntryModelProducer = remember { ChartEntryModelProducer() }
+
+    LaunchedEffect(topDrainers) {
+        val entries = topDrainers.mapIndexed { index, stat ->
+            FloatEntry(x = index.toFloat(), y = stat.value1.toFloat())
+        }
+        chartEntryModelProducer.setEntries(entries)
+    }
+
+    // 3. Create a custom formatter to show the App/Component name on the X-axis
+    val bottomAxisFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+        val index = value.toInt()
+        if (index >= 0 && index < topDrainers.size) {
+            // Truncate long names so they fit on the screen
+            topDrainers[index].title.take(10)
+        } else {
+            ""
+        }
+    }
+
+    // 4. Render the Chart
+    if (topDrainers.isNotEmpty()) {
+        Chart(
+            chart = columnChart(),
+            chartModelProducer = chartEntryModelProducer,
+            startAxis = rememberStartAxis(
+                titleComponent = null,
+                title = "Drain (mAh)"
+            ),
+            bottomAxis = rememberBottomAxis(
+                valueFormatter = bottomAxisFormatter
+            ),
+            modifier = Modifier.fillMaxSize().padding(16.dp)
+        )
+    } else {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Text("Waiting for battery data...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WellbeingDashboard(batteryData: List<BatteryStat>) {
@@ -127,13 +189,10 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .height(250.dp), // Increased height slightly for better chart visibility
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                    // Vico chart placeholder for now
-                    Text("Battery Drain Overview", style = MaterialTheme.typography.titleMedium)
-                }
+                BatteryBarChart(batteryData = batteryData)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
