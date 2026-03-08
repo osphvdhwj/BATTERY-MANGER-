@@ -8,7 +8,8 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam
-import java.util.ArrayList
+import org.json.JSONArray
+import org.json.JSONObject
 
 class XposedInit : IXposedHookLoadPackage {
 
@@ -30,18 +31,37 @@ class XposedInit : IXposedHookLoadPackage {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         XposedBridge.log("BatteryWellbeing: Constructor hooked successfully!")
 
-                        val obj = param.thisObject
-                        val context = param.args[0] as Context
-
                         try {
-                            // Use reflection to get the private mEntries list
-                            val mEntriesField = XposedHelpers.findField(obj.javaClass, "mEntries")
-                            mEntriesField.isAccessible = true
-                            val entriesList = mEntriesField.get(obj) as? List<*>
+                            val mEntriesList = XposedHelpers.getObjectField(param.thisObject, "mEntries") as? List<*>
 
-                            if (entriesList != null) {
-                                XposedBridge.log("BatteryWellbeing: Extracted \${entriesList.size} entries")
-                                broadcastDataToFrontend(context, entriesList)
+                            if (mEntriesList != null) {
+                                val jsonArray = JSONArray()
+
+                                for (entry in mEntriesList) {
+                                    if (entry == null) continue
+
+                                    val title = XposedHelpers.getObjectField(entry, "title") as? String ?: "Unknown"
+                                    val value1 = XposedHelpers.getDoubleField(entry, "value1")
+                                    val value2 = XposedHelpers.getDoubleField(entry, "value2")
+
+                                    val jsonObject = JSONObject().apply {
+                                        put("title", title)
+                                        put("value1", value1)
+                                        put("value2", value2)
+                                    }
+                                    jsonArray.put(jsonObject)
+                                }
+
+                                // Grab the context from the constructor arguments to send the broadcast
+                                val context = param.args[0] as Context
+
+                                val intent = Intent("com.crdroid.batterywellbeing.UPDATE_STATS").apply {
+                                    putExtra("battery_data_json", jsonArray.toString())
+                                    setPackage("com.crdroid.batterywellbeing") // Explicitly target our frontend app
+                                }
+
+                                context.sendBroadcast(intent)
+                                XposedBridge.log("BatteryWellbeing: Broadcast sent to frontend with \${jsonArray.length()} items!")
                             } else {
                                 XposedBridge.log("BatteryWellbeing: mEntries is null")
                             }
@@ -54,48 +74,6 @@ class XposedInit : IXposedHookLoadPackage {
             )
         } catch (e: Exception) {
             XposedBridge.log("BatteryWellbeing Error: \${e.message}")
-            e.printStackTrace()
-        }
-    }
-
-    private fun broadcastDataToFrontend(context: Context, entriesList: List<*>) {
-        try {
-            val intent = Intent("com.crdroid.batterywellbeing.UPDATE_DATA")
-
-            // To pass the data via Intent, we need to extract and format the data
-            // since the actual Entry objects are internal classes that we can't easily parcel.
-            val formattedData = ArrayList<String>()
-
-            for (entryObj in entriesList) {
-                if (entryObj == null) continue
-
-                // Use reflection to get fields from Entry class
-                try {
-                    val titleField = XposedHelpers.findField(entryObj.javaClass, "title")
-                    titleField.isAccessible = true
-                    val title = titleField.get(entryObj) as? String ?: "Unknown"
-
-                    val value1Field = XposedHelpers.findField(entryObj.javaClass, "value1")
-                    value1Field.isAccessible = true
-                    val value1 = value1Field.getDouble(entryObj)
-
-                    val value2Field = XposedHelpers.findField(entryObj.javaClass, "value2")
-                    value2Field.isAccessible = true
-                    val value2 = value2Field.getDouble(entryObj)
-
-                    formattedData.add("\$title|\$value1|\$value2")
-                } catch (e: Exception) {
-                    XposedBridge.log("BatteryWellbeing: Error parsing entry: \${e.message}")
-                }
-            }
-
-            intent.putStringArrayListExtra("battery_data", formattedData)
-            intent.setPackage("com.crdroid.batterywellbeing")
-
-            context.sendBroadcast(intent)
-            XposedBridge.log("BatteryWellbeing: Broadcast sent with \${formattedData.size} items")
-        } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing Broadcast Error: \${e.message}")
             e.printStackTrace()
         }
     }

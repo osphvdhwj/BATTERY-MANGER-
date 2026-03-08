@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,51 +13,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import java.util.ArrayList
+import org.json.JSONArray
 
-data class BatteryEntry(
-    val title: String,
-    val value1: Double,
-    val value2: Double
-)
+// 1. Create a data model for the parsed JSON
+data class BatteryStat(val title: String, val value1: Double, val value2: Double)
 
 class MainActivity : ComponentActivity() {
 
-    private val batteryDataState = mutableStateListOf<BatteryEntry>()
-
-    private val dataReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == "com.crdroid.batterywellbeing.UPDATE_DATA") {
-                val dataList = intent.getStringArrayListExtra("battery_data")
-                if (dataList != null) {
-                    updateData(dataList)
-                }
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Register receiver for broadcasts from Xposed hook
-        val filter = IntentFilter("com.crdroid.batterywellbeing.UPDATE_DATA")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(dataReceiver, filter, Context.RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(dataReceiver, filter)
-        }
-
-        // Add some mock data for initial UI testing
-        if (batteryDataState.isEmpty()) {
-            batteryDataState.addAll(
-                listOf(
-                    BatteryEntry("Screen", 500.0, 1000.0),
-                    BatteryEntry("CPU", 300.0, 500.0),
-                    BatteryEntry("Wi-Fi", 150.0, 200.0)
-                )
-            )
-        }
 
         setContent {
             MaterialTheme {
@@ -66,43 +31,85 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WellbeingDashboard(batteryDataState)
+                    WellbeingDashboardScreen()
                 }
             }
         }
     }
+}
 
-    override fun onDestroy() {
-        super.onDestroy()
-        unregisterReceiver(dataReceiver)
-    }
+// 2. Set up the Broadcast Receiver
+@Composable
+fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
+    val context = LocalContext.current
 
-    private fun updateData(rawData: ArrayList<String>) {
-        val newEntries = rawData.mapNotNull { item ->
-            val parts = item.split("|")
-            if (parts.size >= 3) {
-                try {
-                    BatteryEntry(
-                        title = parts[0],
-                        value1 = parts[1].toDouble(),
-                        value2 = parts[2].toDouble()
-                    )
-                } catch (e: Exception) {
-                    null
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == "com.crdroid.batterywellbeing.UPDATE_STATS") {
+                    val jsonString = intent.getStringExtra("battery_data_json") ?: return
+
+                    try {
+                        val jsonArray = JSONArray(jsonString)
+                        val statsList = mutableListOf<BatteryStat>()
+
+                        for (i in 0 until jsonArray.length()) {
+                            val obj = jsonArray.getJSONObject(i)
+                            statsList.add(
+                                BatteryStat(
+                                    title = obj.getString("title"),
+                                    value1 = obj.getDouble("value1"),
+                                    value2 = obj.getDouble("value2")
+                                )
+                            )
+                        }
+                        onStatsUpdated(statsList)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-            } else {
-                null
             }
         }
 
-        batteryDataState.clear()
-        batteryDataState.addAll(newEntries)
+        // Register the receiver
+        val filter = IntentFilter("com.crdroid.batterywellbeing.UPDATE_STATS")
+        // Use RECEIVER_EXPORTED for Android 14+ (API 34+) compatibility
+        context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+
+        onDispose {
+            context.unregisterReceiver(receiver)
+        }
     }
+}
+
+// 3. Connecting it to the UI
+@Composable
+fun WellbeingDashboardScreen() {
+    var batteryStats by remember { mutableStateOf<List<BatteryStat>>(emptyList()) }
+
+    // This listens for the system broadcast silently in the background
+    BatteryStatsReceiver { newStats ->
+        batteryStats = newStats
+    }
+
+    // Pass the state to the UI layout
+    // Provide some mock data if empty just to show the UI works initially
+    val displayStats = if (batteryStats.isEmpty()) {
+        listOf(
+            BatteryStat("Screen", 500.0, 1000.0),
+            BatteryStat("CPU", 300.0, 500.0),
+            BatteryStat("Wi-Fi", 150.0, 200.0)
+        )
+    } else {
+        batteryStats
+    }
+
+    WellbeingDashboard(displayStats)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WellbeingDashboard(batteryData: List<BatteryEntry>) {
+fun WellbeingDashboard(batteryData: List<BatteryStat>) {
     Scaffold(
         topBar = {
             LargeTopAppBar(
@@ -141,8 +148,8 @@ fun WellbeingDashboard(batteryData: List<BatteryEntry>) {
             Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn {
-                items(batteryData) { entry ->
-                    AppUsageLimitItem(entry)
+                items(batteryData) { stat ->
+                    AppUsageLimitItem(stat)
                 }
             }
         }
@@ -150,10 +157,10 @@ fun WellbeingDashboard(batteryData: List<BatteryEntry>) {
 }
 
 @Composable
-fun AppUsageLimitItem(entry: BatteryEntry) {
+fun AppUsageLimitItem(stat: BatteryStat) {
     ListItem(
-        headlineContent = { Text(entry.title) },
-        supportingContent = { Text("Drain: \${String.format("%.2f", entry.value1)} mAh") },
+        headlineContent = { Text(stat.title) },
+        supportingContent = { Text("Drain: \${String.format("%.2f", stat.value1)} mAh") },
         trailingContent = {
             OutlinedButton(onClick = { /* Open Dialog */ }) {
                 Text("Details")
