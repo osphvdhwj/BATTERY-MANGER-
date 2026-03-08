@@ -26,6 +26,12 @@ class XposedInit : IXposedHookLoadPackage {
             hookBatteryDashboardUI(lpparam)
             return
         }
+
+        // 3. 🚀 NEW: Hook the Tethering APEX for Hotspot Limits
+        if (lpparam.packageName == "com.google.android.tethering") {
+            HotspotLimitHook.initHooks(lpparam.classLoader)
+            return
+        }
     }
 
     private fun hookBatteryServiceForIsland(lpparam: LoadPackageParam) {
@@ -58,6 +64,7 @@ class XposedInit : IXposedHookLoadPackage {
                                             ModuleConfig.enableThermalWarnings = intent.getBooleanExtra("enableThermalWarnings", true)
                                             ModuleConfig.enableRogueApp = intent.getBooleanExtra("enableRogueApp", true)
                                             ModuleConfig.enableStorageAbuse = intent.getBooleanExtra("enableStorageAbuse", true)
+                                            ModuleConfig.enableHotspotLimits = intent.getBooleanExtra("enableHotspotLimits", true)
                                             de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: Module settings updated from App UI.")
                                         }
                                     }

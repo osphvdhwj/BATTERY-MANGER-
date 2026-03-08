@@ -5,5 +5,6 @@ object ModuleConfig {
     var enableThermalWarnings: Boolean = true
     var enableRogueApp: Boolean = true
     var enableStorageAbuse: Boolean = true
+    var enableHotspotLimits: Boolean = true
     var storageThresholdMB: Int = 500
 }

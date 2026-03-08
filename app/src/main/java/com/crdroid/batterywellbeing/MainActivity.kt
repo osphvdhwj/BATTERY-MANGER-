@@ -463,6 +463,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
     var thermalWarn by remember { mutableStateOf(prefs.getBoolean("enableThermalWarnings", true)) }
     var rogueApp by remember { mutableStateOf(prefs.getBoolean("enableRogueApp", true)) }
     var storageAbuse by remember { mutableStateOf(prefs.getBoolean("enableStorageAbuse", true)) }
+    var hotspotLimits by remember { mutableStateOf(prefs.getBoolean("enableHotspotLimits", true)) }
 
     // Broadcast helper
     fun saveAndBroadcast() {
@@ -471,6 +472,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
             .putBoolean("enableThermalWarnings", thermalWarn)
             .putBoolean("enableRogueApp", rogueApp)
             .putBoolean("enableStorageAbuse", storageAbuse)
+            .putBoolean("enableHotspotLimits", hotspotLimits)
             .apply()
 
         val intent = Intent("com.crdroid.batterywellbeing.UPDATE_SETTINGS").apply {
@@ -478,6 +480,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
             putExtra("enableThermalWarnings", thermalWarn)
             putExtra("enableRogueApp", rogueApp)
             putExtra("enableStorageAbuse", storageAbuse)
+            putExtra("enableHotspotLimits", hotspotLimits)
         }
         context.sendBroadcast(intent)
     }
@@ -502,6 +505,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
             SettingToggle("Thermal Throttling Warnings", thermalWarn) { thermalWarn = it; saveAndBroadcast() }
             SettingToggle("Rogue App Drain Detection", rogueApp) { rogueApp = it; saveAndBroadcast() }
             SettingToggle("Background Storage Abuse", storageAbuse) { storageAbuse = it; saveAndBroadcast() }
+            SettingToggle("Hotspot Per-Connection Limits", hotspotLimits) { hotspotLimits = it; saveAndBroadcast() }
         }
     }
 }

@@ -2,5 +2,6 @@
     <string-array name="xposed_scope">
         <item>com.android.frameworks.core.batterystatsviewer</item>
         <item>android</item>
+        <item>com.google.android.tethering</item>
     </string-array>
 </resources>
