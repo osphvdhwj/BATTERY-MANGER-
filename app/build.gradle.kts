@@ -12,7 +12,18 @@ android {
         minSdk = 35
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0-DynamicIsland-Edition"
+
+        // 🚀 MICRO-APK TWEAK 1: Strip unused languages.
+        // Only package English string resources.
+        resConfigs("en")
+
+        // 🚀 MICRO-APK TWEAK 2: Hardware Specific Targeting.
+        // Strip out x86, x86_64, and armeabi-v7a.
+        // Only build the native binaries required for the Poco X5 Pro.
+        ndk {
+            abiFilters.add("arm64-v8a")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -21,8 +32,23 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            // 🚀 MICRO-APK TWEAK 3: Force R8 Minification on Debug
+            // This strips dead code, unused Jetpack Compose classes, and unused Vico chart features.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+
+            // Keep debuggable true so Xposed/LSPosed can still hook it properly
+            isDebuggable = true
+        }
+
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
