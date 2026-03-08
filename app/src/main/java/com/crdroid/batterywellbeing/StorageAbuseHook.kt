@@ -20,7 +20,7 @@ object StorageAbuseHook {
                 batteryServiceClass,
                 classLoader,
                 "processValuesLocked",
-                Boolean::class.javaPrimitiveType,
+                java.lang.Boolean.TYPE,
                 object : XC_MethodHook() {
                     var lastCheckTime = 0L
 
@@ -61,11 +61,12 @@ object StorageAbuseHook {
                                             // Fire to Dynamic Island
                                             if (ModuleConfig.enableStorageAbuse) {
                                                 IslandDispatcher.dispatchEvent(
-                                                context,
-                                                "ROGUE_APP_DETECTED", // Reusing the rogue app UI template
-                                                0,
-                                                "\$appName (Storage Abuse: \$formattedWrite)"
-                                            )
+                                                    context,
+                                                    "ROGUE_APP_DETECTED",
+                                                    0,
+                                                    "$appName (Storage Abuse: $formattedWrite)"
+                                                )
+                                            }
                                         }
                                     }
                                 }

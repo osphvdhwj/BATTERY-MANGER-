@@ -118,32 +118,32 @@ object HotspotLimitHook {
 
     private fun kickClient(macAddress: String) {
         try {
-            // Get the system context to access WifiManager
             val activityThreadClass = XposedHelpers.findClass("android.app.ActivityThread", null)
             val currentActivityThread = XposedHelpers.callStaticMethod(activityThreadClass, "currentActivityThread")
             val context = XposedHelpers.callMethod(currentActivityThread, "getSystemContext") as Context
 
-            val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val wifiManager = context.getSystemService(Context.WIFI_SERVICE)
 
-            // Read current config
-            val currentConfig = wifiManager.softApConfiguration
-            val blockedList = currentConfig.blockedClientList.toMutableList()
+            // Use reflection to bypass hidden API restrictions
+            val currentConfig = XposedHelpers.callMethod(wifiManager, "getSoftApConfiguration")
+            val blockedListObj = XposedHelpers.callMethod(currentConfig, "getBlockedClientList") as List<*>
+            val blockedList = blockedListObj.toMutableList()
 
-            // Add the offending MAC
-            val macObj = MacAddress.fromString(macAddress)
+            val macObj = android.net.MacAddress.fromString(macAddress)
             if (!blockedList.contains(macObj)) {
                 blockedList.add(macObj)
 
-                // Commit the new configuration to force native hostapd Deauthentication
-                val newConfig = SoftApConfiguration.Builder(currentConfig)
-                    .setBlockedClientList(blockedList)
-                    .build()
+                // Reflective Builder
+                val builderClass = XposedHelpers.findClass("android.net.wifi.SoftApConfiguration\$Builder", null)
+                val builder = XposedHelpers.newInstance(builderClass, currentConfig)
+                XposedHelpers.callMethod(builder, "setBlockedClientList", blockedList)
+                val newConfig = XposedHelpers.callMethod(builder, "build")
 
-                wifiManager.softApConfiguration = newConfig
+                XposedHelpers.callMethod(wifiManager, "setSoftApConfiguration", newConfig)
                 activeClients.remove(macAddress)
             }
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing Kick Error: \${e.message}")
+            XposedBridge.log("BatteryWellbeing Kick Error: ${e.message}")
         }
     }
 

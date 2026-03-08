@@ -2,7 +2,6 @@ package com.crdroid.batterywellbeing
 
 import android.content.Context
 import android.content.Intent
-import android.os.BatteryUsageStats
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -160,7 +159,7 @@ class XposedInit : IXposedHookLoadPackage {
                 targetClass,
                 lpparam.classLoader,
                 Context::class.java,
-                BatteryUsageStats::class.java,
+                XposedHelpers.findClass("android.os.BatteryUsageStats", lpparam.classLoader),
                 String::class.java,
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {

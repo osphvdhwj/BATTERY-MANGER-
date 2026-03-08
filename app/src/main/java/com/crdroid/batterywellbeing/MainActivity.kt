@@ -124,7 +124,7 @@ fun formatScreenTime(timeMs: Long): String {
     if (timeMs == 0L) return "0m"
     val minutes = (timeMs / (1000 * 60)) % 60
     val hours = (timeMs / (1000 * 60 * 60))
-    return if (hours > 0) "\${hours}h \${minutes}m" else "\${minutes}m"
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
 fun formatBytes(bytes: Long): String {
@@ -136,7 +136,7 @@ fun formatBytes(bytes: Long): String {
         gb >= 1.0 -> String.format("%.2f GB", gb)
         mb >= 1.0 -> String.format("%.2f MB", mb)
         kb >= 1.0 -> String.format("%.2f KB", kb)
-        else -> "\$bytes B"
+        else -> "$bytes B"
     }
 }
 
@@ -160,9 +160,16 @@ class MainActivity : ComponentActivity() {
                     var showTimeLimitSheet by remember { mutableStateOf(false) }
 
                     if (showSettings) {
-                        SettingsScreen(prefs, this, onNavigateBack = { showSettings = false }, onShowExemptions = { showExemptions = true }, onShowTimeLimits = { showTimeLimitSheet = true })
+                        SettingsScreen(
+                            prefs = prefs,
+                            context = this@MainActivity,
+                            onNavigateBack = { showSettings = false },
+                            onShowExemptions = { showExemptions = true },
+                            onShowTimeLimits = { showTimeLimitSheet = true }
+                        )
                     } else {
                         WellbeingDashboardScreen(prefs) { showSettings = true }
+                    }
 
                     if (showExemptions) {
                         ExemptionsDialog(prefs) { showExemptions = false }
@@ -182,8 +189,6 @@ class MainActivity : ComponentActivity() {
                             onDismiss = { showTimeLimitSheet = false },
                             existingTimers = existingTimers
                         )
-                    }
-                    }
                     }
                 }
             }
@@ -274,7 +279,7 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
             if (enableAppTimers && time > 0) {
                 // In a full implementation, we'd read `appTimeLimits` map.
                 // For now, if the limit exists in SharedPreferences, check it.
-                val limitMs = prefs.getLong("timer_\$pkgName", -1L)
+                val limitMs = prefs.getLong("timer_$pkgName", -1L)
                 if (limitMs > 0 && time >= limitMs) {
                     val intent = Intent("com.crdroid.batterywellbeing.EXECUTE_KILL").apply {
                         putExtra("package_name", pkgName)
@@ -480,10 +485,11 @@ fun AppUsageLimitItem(stat: BatteryStat) {
     ListItem(
         headlineContent = { Text(displayTitle, maxLines = 1) },
         supportingContent = {
-            val drainText = "Drain: \${String.format("%.2f", stat.value1)} mAh"
-            val timeText = if (stat.screenTimeMs > 0) " • Time: \${formatScreenTime(stat.screenTimeMs)}" else ""
-            val networkText = if (stat.wifiBytes > 0 || stat.mobileBytes > 0) " • Data: \${formatBytes(stat.wifiBytes + stat.mobileBytes)}" else ""
-            Text(drainText + timeText + networkText)
+            Column {
+                Text("Drain: ${String.format("%.2f", stat.value1)} mAh")
+                if (stat.screenTimeMs > 0) Text("Time: ${formatScreenTime(stat.screenTimeMs)}")
+                if (stat.wifiBytes > 0 || stat.mobileBytes > 0) Text("Data: ${formatBytes(stat.wifiBytes + stat.mobileBytes)}")
+            }
         },
         trailingContent = {
             OutlinedButton(onClick = { /* Open Dialog */ }) {
@@ -572,13 +578,13 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
             item { SettingToggle("Smart Charge Limit", "Stop charging to protect battery health", smartCharge) { smartCharge = it; saveAndBroadcast() } }
             if (smartCharge) {
                 item {
-                    SettingSlider("Charge Limit: \${smartChargePercent.toInt()}%", smartChargePercent, 50f..95f) {
+                    SettingSlider("Charge Limit: ${smartChargePercent.toInt()}%", smartChargePercent, 50f..95f) {
                         smartChargePercent = it; saveAndBroadcast()
                     }
                 }
             }
             item {
-                SettingSlider("Thermal Warning Alert: \${thermalThreshold.toInt()}°C", thermalThreshold, 35f..50f) {
+                SettingSlider("Thermal Warning Alert: ${thermalThreshold.toInt()}°C", thermalThreshold, 35f..50f) {
                     thermalThreshold = it; saveAndBroadcast()
                 }
             }
@@ -601,7 +607,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
             item { SettingToggle("Background Storage Abuse", "Alert if background apps thrash disk I/O", storageAbuse) { storageAbuse = it; saveAndBroadcast() } }
             if (storageAbuse) {
                 item {
-                    SettingSlider("Write Limit: \${storageAbuseLimitMB.toInt()} MB", storageAbuseLimitMB, 100f..2000f) {
+                    SettingSlider("Write Limit: ${storageAbuseLimitMB.toInt()} MB", storageAbuseLimitMB, 100f..2000f) {
                         storageAbuseLimitMB = it; saveAndBroadcast()
                     }
                 }
@@ -618,7 +624,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
             item { SettingToggle("Per-Connection Hotspot Limit", "Drop clients exceeding data quotas", hotspotLimit) { hotspotLimit = it; saveAndBroadcast() } }
             if (hotspotLimit) {
                 item {
-                    SettingSlider("Client Data Quota: \${hotspotDataMB.toInt()} MB", hotspotDataMB, 100f..2000f) {
+                    SettingSlider("Client Data Quota: ${hotspotDataMB.toInt()} MB", hotspotDataMB, 100f..2000f) {
                         hotspotDataMB = it; saveAndBroadcast()
                     }
                 }

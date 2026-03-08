@@ -45,7 +45,7 @@ class WellbeingWidget : GlanceAppWidget() {
             Column(
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .background(ColorProvider(day = android.graphics.Color.parseColor("#E3E3E3"), night = android.graphics.Color.parseColor("#1E1E1E")))
+                    .background(androidx.glance.color.ColorProvider(day = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor("#E3E3E3")), night = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor("#1E1E1E"))))
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.Start
@@ -53,7 +53,7 @@ class WellbeingWidget : GlanceAppWidget() {
                 Text(
                     text = "Top Usage Today",
                     style = TextStyle(
-                        color = ColorProvider(day = android.graphics.Color.parseColor("#5A5A5A"), night = android.graphics.Color.parseColor("#A0A0A0")),
+                        color = androidx.glance.color.ColorProvider(day = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor("#5A5A5A")), night = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor("#A0A0A0"))),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -64,7 +64,7 @@ class WellbeingWidget : GlanceAppWidget() {
                 Text(
                     text = appName,
                     style = TextStyle(
-                        color = ColorProvider(day = android.graphics.Color.BLACK, night = android.graphics.Color.WHITE),
+                        color = androidx.glance.color.ColorProvider(day = androidx.compose.ui.graphics.Color(android.graphics.Color.BLACK), night = androidx.compose.ui.graphics.Color(android.graphics.Color.WHITE)),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     ),
@@ -76,7 +76,7 @@ class WellbeingWidget : GlanceAppWidget() {
                 Text(
                     text = timeString,
                     style = TextStyle(
-                        color = ColorProvider(day = android.graphics.Color.parseColor("#0066FF"), night = android.graphics.Color.parseColor("#66B2FF")),
+                        color = androidx.glance.color.ColorProvider(day = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor("#0066FF")), night = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor("#66B2FF"))),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )

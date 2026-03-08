@@ -46,7 +46,7 @@ object WellbeingEnforcerHook {
                                                 amsInstance,
                                                 "forceStopPackage",
                                                 targetPackage,
-                                                UserHandle.USER_ALL
+                                                -1
                                             )
 
                                             // Notify the Dynamic Island that justice was served
