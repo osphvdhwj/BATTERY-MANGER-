@@ -2,10 +2,13 @@ package com.crdroid.batterywellbeing
 
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
+import android.app.usage.NetworkStatsManager
+import android.app.usage.NetworkStats
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.ConnectivityManager
 import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
@@ -38,7 +41,9 @@ data class BatteryStat(
     val value1: Double,
     val value2: Double,
     val isApp: Boolean = false,
-    var screenTimeMs: Long = 0L // NEW: Holds daily screen time
+    var screenTimeMs: Long = 0L, // NEW: Holds daily screen time
+    var wifiBytes: Long = 0L,    // NEW
+    var mobileBytes: Long = 0L   // NEW
 )
 
 // Helpers
@@ -75,11 +80,63 @@ fun getDailyScreenTime(context: Context): Map<String, Long> {
     return screenTimeMap
 }
 
+fun getDailyNetworkUsage(context: Context): Map<Int, Pair<Long, Long>> {
+    if (!hasUsageStatsPermission(context)) return emptyMap()
+
+    val networkStatsManager = context.getSystemService(Context.NETWORK_STATS_SERVICE) as NetworkStatsManager
+    val calendar = java.util.Calendar.getInstance()
+    calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+    calendar.set(java.util.Calendar.MINUTE, 0)
+    calendar.set(java.util.Calendar.SECOND, 0)
+    val startTime = calendar.timeInMillis
+    val endTime = System.currentTimeMillis()
+
+    val usageMap = mutableMapOf<Int, Pair<Long, Long>>() // UID -> Pair(WiFi, Mobile)
+
+    try {
+        // Query Wi-Fi
+        val wifiStats = networkStatsManager.querySummary(ConnectivityManager.TYPE_WIFI, null, startTime, endTime)
+        val bucket = NetworkStats.Bucket()
+        while (wifiStats.hasNextBucket()) {
+            wifiStats.getNextBucket(bucket)
+            val current = usageMap[bucket.uid] ?: Pair(0L, 0L)
+            usageMap[bucket.uid] = current.copy(first = current.first + bucket.rxBytes + bucket.txBytes)
+        }
+        wifiStats.close()
+
+        // Query Cellular
+        val mobileStats = networkStatsManager.querySummary(ConnectivityManager.TYPE_MOBILE, null, startTime, endTime)
+        while (mobileStats.hasNextBucket()) {
+            mobileStats.getNextBucket(bucket)
+            val current = usageMap[bucket.uid] ?: Pair(0L, 0L)
+            usageMap[bucket.uid] = current.copy(second = current.second + bucket.rxBytes + bucket.txBytes)
+        }
+        mobileStats.close()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    return usageMap
+}
+
 fun formatScreenTime(timeMs: Long): String {
     if (timeMs == 0L) return "0m"
     val minutes = (timeMs / (1000 * 60)) % 60
     val hours = (timeMs / (1000 * 60 * 60))
     return if (hours > 0) "\${hours}h \${minutes}m" else "\${minutes}m"
+}
+
+fun formatBytes(bytes: Long): String {
+    if (bytes == 0L) return "0 B"
+    val kb = bytes / 1024.0
+    val mb = kb / 1024.0
+    val gb = mb / 1024.0
+    return when {
+        gb >= 1.0 -> String.format("%.2f GB", gb)
+        mb >= 1.0 -> String.format("%.2f MB", mb)
+        kb >= 1.0 -> String.format("%.2f KB", kb)
+        else -> "\$bytes B"
+    }
 }
 
 
@@ -156,27 +213,41 @@ fun WellbeingDashboardScreen() {
     val context = LocalContext.current
     var batteryStats by remember { mutableStateOf<List<BatteryStat>>(emptyList()) }
     var screenTimeMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var networkUsageMap by remember { mutableStateOf<Map<Int, Pair<Long, Long>>>(emptyMap()) }
 
-    // Fetch Screen Time whenever the UI recomposes
+    // Fetch Screen Time and Network whenever the UI recomposes
     LaunchedEffect(Unit) {
         screenTimeMap = getDailyScreenTime(context)
+        networkUsageMap = getDailyNetworkUsage(context)
     }
 
-    // Merge battery data with screen time data
+    // Merge battery data with screen time data and network usage data
     BatteryStatsReceiver { newStats ->
         val mergedStats = newStats.map { stat ->
             // Try to extract pure package name for mapping
             var pkgName = stat.title
+            var uid = -1
             if (pkgName.startsWith("APP|")) {
                 val parts = pkgName.split("|")
                 if (parts.size >= 3) {
+                    try {
+                        uid = parts[1].toInt()
+                    } catch (e: Exception) {
+                        // ignore
+                    }
                     pkgName = parts[2]
                 }
             }
 
             // If the title is a package name, try to fetch its screen time
             val time = screenTimeMap[pkgName] ?: 0L
-            stat.copy(screenTimeMs = time)
+            val network = if (uid != -1) networkUsageMap[uid] else Pair(0L, 0L)
+
+            stat.copy(
+                screenTimeMs = time,
+                wifiBytes = network?.first ?: 0L,
+                mobileBytes = network?.second ?: 0L
+            )
         }
         batteryStats = mergedStats
     }
@@ -188,8 +259,8 @@ fun WellbeingDashboardScreen() {
             BatteryStat("Screen", 500.0, 1000.0, isApp = false),
             BatteryStat("CPU", 300.0, 500.0, isApp = false),
             BatteryStat("Wi-Fi", 150.0, 200.0, isApp = false),
-            BatteryStat("com.android.chrome", 250.0, 0.0, isApp = true, screenTimeMs = 3600000L),
-            BatteryStat("APP|10234|com.instagram.android", 450.0, 0.0, isApp = true, screenTimeMs = 5400000L)
+            BatteryStat("com.android.chrome", 250.0, 0.0, isApp = true, screenTimeMs = 3600000L, wifiBytes = 500000000L, mobileBytes = 150000000L),
+            BatteryStat("APP|10234|com.instagram.android", 450.0, 0.0, isApp = true, screenTimeMs = 5400000L, wifiBytes = 1200000000L, mobileBytes = 0L)
         )
     } else {
         batteryStats
@@ -381,7 +452,8 @@ fun AppUsageLimitItem(stat: BatteryStat) {
         supportingContent = {
             val drainText = "Drain: \${String.format("%.2f", stat.value1)} mAh"
             val timeText = if (stat.screenTimeMs > 0) " • Time: \${formatScreenTime(stat.screenTimeMs)}" else ""
-            Text(drainText + timeText)
+            val networkText = if (stat.wifiBytes > 0 || stat.mobileBytes > 0) " • Data: \${formatBytes(stat.wifiBytes + stat.mobileBytes)}" else ""
+            Text(drainText + timeText + networkText)
         },
         trailingContent = {
             OutlinedButton(onClick = { /* Open Dialog */ }) {

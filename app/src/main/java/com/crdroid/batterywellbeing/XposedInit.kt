@@ -31,6 +31,7 @@ class XposedInit : IXposedHookLoadPackage {
     private fun hookBatteryServiceForIsland(lpparam: LoadPackageParam) {
         // Initialize Rogue App Detectors
         RogueAppHook.initHooks(lpparam.classLoader)
+        StorageAbuseHook.initHooks(lpparam.classLoader)
 
         try {
             val batteryServiceClass = "com.android.server.BatteryService"
