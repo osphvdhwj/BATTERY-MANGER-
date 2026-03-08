@@ -160,7 +160,7 @@ class MainActivity : ComponentActivity() {
                     if (showSettings) {
                         SettingsScreen(prefs, this) { showSettings = false }
                     } else {
-                        WellbeingDashboardScreen { showSettings = true }
+                        WellbeingDashboardScreen(prefs) { showSettings = true }
                     }
                 }
             }
@@ -215,7 +215,7 @@ fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
 }
 
 @Composable
-fun WellbeingDashboardScreen(onSettingsClick: () -> Unit) {
+fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Unit) {
     val context = LocalContext.current
     var batteryStats by remember { mutableStateOf<List<BatteryStat>>(emptyList()) }
     var screenTimeMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
@@ -227,6 +227,8 @@ fun WellbeingDashboardScreen(onSettingsClick: () -> Unit) {
     }
 
     BatteryStatsReceiver { newStats ->
+        val enableAppTimers = prefs.getBoolean("enableAppTimers", false)
+
         val mergedStats = newStats.map { stat ->
             var pkgName = stat.title
             var uid = -1
@@ -244,6 +246,19 @@ fun WellbeingDashboardScreen(onSettingsClick: () -> Unit) {
 
             val time = screenTimeMap[pkgName] ?: 0L
             val network = if (uid != -1) networkUsageMap[uid] else Pair(0L, 0L)
+
+            // Check for executioner logic
+            if (enableAppTimers && time > 0) {
+                // In a full implementation, we'd read `appTimeLimits` map.
+                // For now, if the limit exists in SharedPreferences, check it.
+                val limitMs = prefs.getLong("timer_\$pkgName", -1L)
+                if (limitMs > 0 && time >= limitMs) {
+                    val intent = Intent("com.crdroid.batterywellbeing.EXECUTE_KILL").apply {
+                        putExtra("package_name", pkgName)
+                    }
+                    context.sendBroadcast(intent)
+                }
+            }
 
             stat.copy(
                 screenTimeMs = time,
