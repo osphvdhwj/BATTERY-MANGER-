@@ -58,7 +58,8 @@ object StorageAbuseHook {
                                             XposedBridge.log("BatteryWellbeing: STORAGE ABUSE -> \$appName wrote \$formattedWrite in background!")
 
                                             // Fire to Dynamic Island
-                                            IslandDispatcher.dispatchEvent(
+                                            if (ModuleConfig.enableStorageAbuse) {
+                                                IslandDispatcher.dispatchEvent(
                                                 context,
                                                 "ROGUE_APP_DETECTED", // Reusing the rogue app UI template
                                                 0,

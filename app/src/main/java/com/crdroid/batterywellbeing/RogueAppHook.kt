@@ -35,7 +35,9 @@ object RogueAppHook {
                             val appName = getAppName(context, packageName)
 
                             // Fire the Dynamic Island trigger!
-                            IslandDispatcher.dispatchEvent(context, "ROGUE_APP_DETECTED", 0, appName)
+                            if (ModuleConfig.enableRogueApp) {
+                                IslandDispatcher.dispatchEvent(context, "ROGUE_APP_DETECTED", 0, appName)
+                            }
 
                             // 🚨 ELITE MOVE: Block the ugly default Android system notification
                             // By setting the result to null, we skip the original method execution.
@@ -81,7 +83,9 @@ object RogueAppHook {
                             val appName = getAppName(context, packageName)
 
                             // Fire to the Island with the reason
-                            IslandDispatcher.dispatchEvent(context, "ROGUE_APP_DETECTED", 0, "\$appName (Phantom Processes)")
+                            if (ModuleConfig.enableRogueApp) {
+                                IslandDispatcher.dispatchEvent(context, "ROGUE_APP_DETECTED", 0, "\$appName (Phantom Processes)")
+                            }
 
                         } catch (e: Exception) {
                             XposedBridge.log("BatteryWellbeing PhantomProcess Hook Error: \${e.message}")

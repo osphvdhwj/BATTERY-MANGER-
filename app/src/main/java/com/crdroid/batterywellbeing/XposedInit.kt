@@ -49,6 +49,24 @@ class XposedInit : IXposedHookLoadPackage {
                             val serviceInstance = param.thisObject
                             val context = XposedHelpers.getObjectField(serviceInstance, "mContext") as Context
 
+                            // 1. Register the Reverse-IPC Receiver ONCE
+                            if (XposedHelpers.getAdditionalInstanceField(serviceInstance, "receiverRegistered") == null) {
+                                val receiver = object : android.content.BroadcastReceiver() {
+                                    override fun onReceive(ctx: android.content.Context, intent: android.content.Intent) {
+                                        if (intent.action == "com.crdroid.batterywellbeing.UPDATE_SETTINGS") {
+                                            ModuleConfig.enableSmartCharge = intent.getBooleanExtra("enableSmartCharge", true)
+                                            ModuleConfig.enableThermalWarnings = intent.getBooleanExtra("enableThermalWarnings", true)
+                                            ModuleConfig.enableRogueApp = intent.getBooleanExtra("enableRogueApp", true)
+                                            ModuleConfig.enableStorageAbuse = intent.getBooleanExtra("enableStorageAbuse", true)
+                                            de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: Module settings updated from App UI.")
+                                        }
+                                    }
+                                }
+                                val filter = android.content.IntentFilter("com.crdroid.batterywellbeing.UPDATE_SETTINGS")
+                                context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_EXPORTED)
+                                XposedHelpers.setAdditionalInstanceField(serviceInstance, "receiverRegistered", true)
+                            }
+
                             val healthInfo = XposedHelpers.getObjectField(serviceInstance, "mHealthInfo")
                             val currentLevel = XposedHelpers.getIntField(healthInfo, "batteryLevel")
                             // AOSP stores temp in tenths of a degree Celsius
@@ -58,7 +76,7 @@ class XposedInit : IXposedHookLoadPackage {
                             // --- DYNAMIC ISLAND TRIGGERS ---
 
                             // Smart Charge Limit (e.g., holding at 80% while plugged in)
-                            if (currentLevel == 80 && plugType != 0 && lastNotifiedLevel != 80) {
+                            if (ModuleConfig.enableSmartCharge && currentLevel == 80 && plugType != 0 && lastNotifiedLevel != 80) {
                                 IslandDispatcher.dispatchEvent(context, "SMART_CHARGE_LIMIT", currentLevel)
                                 lastNotifiedLevel = currentLevel
                             } else if (currentLevel != 80) {
@@ -66,7 +84,7 @@ class XposedInit : IXposedHookLoadPackage {
                             }
 
                             // Thermal Throttling Warning (Over 42°C)
-                            if (batteryTemp >= 42 && batteryTemp != lastNotifiedTemp) {
+                            if (ModuleConfig.enableThermalWarnings && batteryTemp >= 42 && batteryTemp != lastNotifiedTemp) {
                                 IslandDispatcher.dispatchEvent(context, "THERMAL_WARNING", currentLevel, "\$batteryTemp°C")
                                 lastNotifiedTemp = batteryTemp
                             } else if (batteryTemp < 40) {

@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.os.Bundle
 import android.os.Process
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -35,15 +37,14 @@ import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
 import com.patrykandpatrick.vico.core.entry.ChartEntryModelProducer
 import com.patrykandpatrick.vico.core.entry.FloatEntry
 
-// 1. Create a data model for the parsed JSON
 data class BatteryStat(
     val title: String,
     val value1: Double,
     val value2: Double,
     val isApp: Boolean = false,
-    var screenTimeMs: Long = 0L, // NEW: Holds daily screen time
-    var wifiBytes: Long = 0L,    // NEW
-    var mobileBytes: Long = 0L   // NEW
+    var screenTimeMs: Long = 0L,
+    var wifiBytes: Long = 0L,
+    var mobileBytes: Long = 0L
 )
 
 // Helpers
@@ -141,9 +142,12 @@ fun formatBytes(bytes: Long): String {
 
 
 class MainActivity : ComponentActivity() {
+    private lateinit var prefs: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        prefs = getSharedPreferences("BatteryWellbeingPrefs", Context.MODE_PRIVATE)
 
         setContent {
             MaterialTheme {
@@ -151,14 +155,19 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WellbeingDashboardScreen()
+                    var showSettings by remember { mutableStateOf(false) }
+
+                    if (showSettings) {
+                        SettingsScreen(prefs, this) { showSettings = false }
+                    } else {
+                        WellbeingDashboardScreen { showSettings = true }
+                    }
                 }
             }
         }
     }
 }
 
-// 2. Set up the Broadcast Receiver
 @Composable
 fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
     val context = LocalContext.current
@@ -196,9 +205,7 @@ fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
             }
         }
 
-        // Register the receiver
         val filter = IntentFilter("com.crdroid.batterywellbeing.UPDATE_STATS")
-        // Use RECEIVER_EXPORTED for Android 14+ (API 34+) compatibility
         context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
 
         onDispose {
@@ -207,24 +214,20 @@ fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
     }
 }
 
-// 3. Connecting it to the UI
 @Composable
-fun WellbeingDashboardScreen() {
+fun WellbeingDashboardScreen(onSettingsClick: () -> Unit) {
     val context = LocalContext.current
     var batteryStats by remember { mutableStateOf<List<BatteryStat>>(emptyList()) }
     var screenTimeMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var networkUsageMap by remember { mutableStateOf<Map<Int, Pair<Long, Long>>>(emptyMap()) }
 
-    // Fetch Screen Time and Network whenever the UI recomposes
     LaunchedEffect(Unit) {
         screenTimeMap = getDailyScreenTime(context)
         networkUsageMap = getDailyNetworkUsage(context)
     }
 
-    // Merge battery data with screen time data and network usage data
     BatteryStatsReceiver { newStats ->
         val mergedStats = newStats.map { stat ->
-            // Try to extract pure package name for mapping
             var pkgName = stat.title
             var uid = -1
             if (pkgName.startsWith("APP|")) {
@@ -239,7 +242,6 @@ fun WellbeingDashboardScreen() {
                 }
             }
 
-            // If the title is a package name, try to fetch its screen time
             val time = screenTimeMap[pkgName] ?: 0L
             val network = if (uid != -1) networkUsageMap[uid] else Pair(0L, 0L)
 
@@ -252,8 +254,6 @@ fun WellbeingDashboardScreen() {
         batteryStats = mergedStats
     }
 
-    // Pass the state to the UI layout
-    // Provide some mock data if empty just to show the UI works initially
     val displayStats = if (batteryStats.isEmpty()) {
         listOf(
             BatteryStat("Screen", 500.0, 1000.0, isApp = false),
@@ -266,7 +266,7 @@ fun WellbeingDashboardScreen() {
         batteryStats
     }
 
-    WellbeingDashboard(displayStats, context)
+    WellbeingDashboard(displayStats, context, onSettingsClick)
 }
 
 @Composable
@@ -305,15 +305,13 @@ fun PermissionBanner(context: Context) {
 
 @Composable
 fun BatteryBarChart(batteryData: List<BatteryStat>) {
-    // 1. Sort and filter to get the top 5 highest drainers to keep the chart clean
     val topDrainers = remember(batteryData) {
         batteryData
-            .filter { it.value1 > 0 } // Only show items that actually drained power
+            .filter { it.value1 > 0 }
             .sortedByDescending { it.value1 }
             .take(5)
     }
 
-    // 2. Map the data into Vico's FloatEntry format
     val chartEntryModelProducer = remember { ChartEntryModelProducer() }
 
     LaunchedEffect(topDrainers) {
@@ -323,13 +321,10 @@ fun BatteryBarChart(batteryData: List<BatteryStat>) {
         chartEntryModelProducer.setEntries(entries)
     }
 
-    // 3. Create a custom formatter to show the App/Component name on the X-axis
     val bottomAxisFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
         val index = value.toInt()
         if (index >= 0 && index < topDrainers.size) {
-            // Truncate long names so they fit on the screen
             var titleStr = topDrainers[index].title
-            // Quick cleanup for "APP|..." prefix for the chart
             if (titleStr.startsWith("APP|")) {
                 val parts = titleStr.split("|")
                 if (parts.size >= 3) {
@@ -342,7 +337,6 @@ fun BatteryBarChart(batteryData: List<BatteryStat>) {
         }
     }
 
-    // 4. Render the Chart
     if (topDrainers.isNotEmpty()) {
         Chart(
             chart = columnChart(),
@@ -357,7 +351,7 @@ fun BatteryBarChart(batteryData: List<BatteryStat>) {
             modifier = Modifier.fillMaxSize().padding(16.dp)
         )
     } else {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Waiting for battery data...", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -365,11 +359,16 @@ fun BatteryBarChart(batteryData: List<BatteryStat>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context) {
+fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context, onSettingsClick: () -> Unit) {
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text("Digital Wellbeing") }
+                title = { Text("Digital Wellbeing") },
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Text("⚙️") // Simple settings icon
+                    }
+                }
             )
         }
     ) { padding ->
@@ -379,14 +378,12 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context) {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // Show the permission request if needed
             PermissionBanner(context)
 
-            // 1. The Main Chart
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(250.dp), // Increased height slightly for better chart visibility
+                    .height(250.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 BatteryBarChart(batteryData = batteryData)
@@ -394,13 +391,10 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- Categorized Lists ---
-
             val appStats = batteryData.filter { it.isApp }.sortedByDescending { it.value1 }
             val hardwareStats = batteryData.filter { !it.isApp }.sortedByDescending { it.value1 }
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                // Section: App Drain
                 if (appStats.isNotEmpty()) {
                     item {
                         Text(
@@ -411,19 +405,18 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context) {
                         )
                     }
                     items(appStats) { stat ->
-                        AppUsageLimitItem(stat) // Reusing your existing item UI
+                        AppUsageLimitItem(stat)
                     }
                 }
 
                 item { Spacer(modifier = Modifier.height(16.dp)) }
 
-                // Section: Hardware Drain
                 if (hardwareStats.isNotEmpty()) {
                     item {
                         Text(
                             text = "Hardware & System",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.tertiary, // Different color for distinction
+                            color = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
@@ -438,7 +431,6 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context) {
 
 @Composable
 fun AppUsageLimitItem(stat: BatteryStat) {
-    // Quick cleanup for "APP|uid|package" prefix for display
     var displayTitle = stat.title
     if (displayTitle.startsWith("APP|")) {
         val parts = displayTitle.split("|")
@@ -461,4 +453,67 @@ fun AppUsageLimitItem(stat: BatteryStat) {
             }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: () -> Unit) {
+    // Load states
+    var smartCharge by remember { mutableStateOf(prefs.getBoolean("enableSmartCharge", true)) }
+    var thermalWarn by remember { mutableStateOf(prefs.getBoolean("enableThermalWarnings", true)) }
+    var rogueApp by remember { mutableStateOf(prefs.getBoolean("enableRogueApp", true)) }
+    var storageAbuse by remember { mutableStateOf(prefs.getBoolean("enableStorageAbuse", true)) }
+
+    // Broadcast helper
+    fun saveAndBroadcast() {
+        prefs.edit()
+            .putBoolean("enableSmartCharge", smartCharge)
+            .putBoolean("enableThermalWarnings", thermalWarn)
+            .putBoolean("enableRogueApp", rogueApp)
+            .putBoolean("enableStorageAbuse", storageAbuse)
+            .apply()
+
+        val intent = Intent("com.crdroid.batterywellbeing.UPDATE_SETTINGS").apply {
+            putExtra("enableSmartCharge", smartCharge)
+            putExtra("enableThermalWarnings", thermalWarn)
+            putExtra("enableRogueApp", rogueApp)
+            putExtra("enableStorageAbuse", storageAbuse)
+        }
+        context.sendBroadcast(intent)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Module Settings") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Text("←", style = MaterialTheme.typography.titleLarge) // Simple back arrow
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+            Text("Dynamic Island Triggers", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            SettingToggle("Smart Charge Limit Alerts", smartCharge) { smartCharge = it; saveAndBroadcast() }
+            SettingToggle("Thermal Throttling Warnings", thermalWarn) { thermalWarn = it; saveAndBroadcast() }
+            SettingToggle("Rogue App Drain Detection", rogueApp) { rogueApp = it; saveAndBroadcast() }
+            SettingToggle("Background Storage Abuse", storageAbuse) { storageAbuse = it; saveAndBroadcast() }
+        }
+    }
+}
+
+@Composable
+fun SettingToggle(title: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyLarge)
+        Switch(checked = isChecked, onCheckedChange = onCheckedChange)
+    }
 }
