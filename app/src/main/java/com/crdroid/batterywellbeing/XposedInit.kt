@@ -90,12 +90,26 @@ class XposedInit : IXposedHookLoadPackage {
                                             de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: Exemptions updated. Loaded ${set.size} apps.")
 
                                             de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: Module settings updated from App UI.")
+                                        } else if (intent.action == "com.crdroid.batterywellbeing.UPDATE_TIMERS") {
+                                            val payload = intent.getStringExtra("timers_payload") ?: return
+                                            try {
+                                                val jsonObject = org.json.JSONObject(payload)
+                                                val newTimers = mutableMapOf<String, Long>()
+                                                jsonObject.keys().forEach { key ->
+                                                    newTimers[key] = jsonObject.getLong(key)
+                                                }
+                                                ModuleConfig.appTimeLimits = newTimers
+                                                de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: App Timers updated in system_server!")
+                                            } catch (e: Exception) {
+                                                de.robv.android.xposed.XposedBridge.log("BatteryWellbeing Timer Parse Error: ${e.message}")
+                                            }
                                         }
                                     }
                                 }
                                 val filter = android.content.IntentFilter()
                                 filter.addAction("com.crdroid.batterywellbeing.UPDATE_SETTINGS")
                                 filter.addAction("com.crdroid.batterywellbeing.UPDATE_EXEMPTIONS")
+                                filter.addAction("com.crdroid.batterywellbeing.UPDATE_TIMERS")
                                 context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_EXPORTED)
                                 XposedHelpers.setAdditionalInstanceField(serviceInstance, "receiverRegistered", true)
                             }

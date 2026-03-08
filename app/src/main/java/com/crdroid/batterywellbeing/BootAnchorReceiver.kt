@@ -36,8 +36,13 @@ class BootAnchorReceiver : BroadcastReceiver() {
             }
             context.sendBroadcast(exemptionsIntent)
 
-            // Note: Timers are handled in the frontend UI, so broadcasting them to system_server
-            // isn't needed right now based on our architecture.
+            // 3. Re-arm timers
+            val timersJson = prefs.getString("app_timers_json", "{}")
+            val timersIntent = Intent("com.crdroid.batterywellbeing.UPDATE_TIMERS").apply {
+                putExtra("timers_payload", timersJson)
+            }
+            context.sendBroadcast(timersIntent)
+
         }
     }
 }

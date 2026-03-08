@@ -157,14 +157,32 @@ class MainActivity : ComponentActivity() {
                 ) {
                     var showSettings by remember { mutableStateOf(false) }
                     var showExemptions by remember { mutableStateOf(false) }
+                    var showTimeLimitSheet by remember { mutableStateOf(false) }
 
                     if (showSettings) {
-                        SettingsScreen(prefs, this, onNavigateBack = { showSettings = false }, onShowExemptions = { showExemptions = true })
+                        SettingsScreen(prefs, this, onNavigateBack = { showSettings = false }, onShowExemptions = { showExemptions = true }, onShowTimeLimits = { showTimeLimitSheet = true })
                     } else {
                         WellbeingDashboardScreen(prefs) { showSettings = true }
 
                     if (showExemptions) {
                         ExemptionsDialog(prefs) { showExemptions = false }
+                    }
+
+                    if (showTimeLimitSheet) {
+                        val savedJson = prefs.getString("app_timers_json", "{}") ?: "{}"
+                        val existingTimers = mutableMapOf<String, Long>()
+                        try {
+                            val jsonObject = org.json.JSONObject(savedJson)
+                            jsonObject.keys().forEach { key ->
+                                existingTimers[key] = jsonObject.getLong(key)
+                            }
+                        } catch (e: Exception) {}
+
+                        com.crdroid.batterywellbeing.ui.AppTimeLimitSheet(
+                            onDismiss = { showTimeLimitSheet = false },
+                            existingTimers = existingTimers
+                        )
+                    }
                     }
                     }
                 }
@@ -477,7 +495,7 @@ fun AppUsageLimitItem(stat: BatteryStat) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: () -> Unit, onShowExemptions: () -> Unit) {
+fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: () -> Unit, onShowExemptions: () -> Unit, onShowTimeLimits: () -> Unit) {
     // 🔋 Battery States
     var smartCharge by remember { mutableStateOf(prefs.getBoolean("enableSmartCharge", true)) }
     var smartChargePercent by remember { mutableStateOf(prefs.getInt("smartChargeLimitPercent", 80).toFloat()) }
@@ -571,7 +589,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
             item { SettingToggle("Strict App Timers", "Force close apps when daily limit is reached", enableAppTimers) { enableAppTimers = it; saveAndBroadcast() } }
             item { SettingToggle("Bedtime Mode Enforcer", "Aggressively kill media/game processes at night", bedtimeMode) { bedtimeMode = it; saveAndBroadcast() } }
             item {
-                OutlinedButton(onClick = { /* TODO: Open per-app timer dialog */ }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                OutlinedButton(onClick = onShowTimeLimits, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Text("Configure Per-App Time Limits")
                 }
             }
