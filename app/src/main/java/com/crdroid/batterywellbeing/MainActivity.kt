@@ -28,7 +28,12 @@ import com.patrykandpatrick.vico.core.entry.ChartEntryModelProducer
 import com.patrykandpatrick.vico.core.entry.FloatEntry
 
 // 1. Create a data model for the parsed JSON
-data class BatteryStat(val title: String, val value1: Double, val value2: Double)
+data class BatteryStat(
+    val title: String,
+    val value1: Double,
+    val value2: Double,
+    val isApp: Boolean = false // New flag to categorize
+)
 
 class MainActivity : ComponentActivity() {
 
@@ -65,11 +70,18 @@ fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
 
                         for (i in 0 until jsonArray.length()) {
                             val obj = jsonArray.getJSONObject(i)
+                            val title = obj.getString("title")
+
+                            // Hardware components are usually explicitly named.
+                            // Anything resembling an app package (com.xxx) or an APP| prefix is an app.
+                            val isAppDrain = title.contains(".") || title.startsWith("APP|")
+
                             statsList.add(
                                 BatteryStat(
-                                    title = obj.getString("title"),
+                                    title = title,
                                     value1 = obj.getDouble("value1"),
-                                    value2 = obj.getDouble("value2")
+                                    value2 = obj.getDouble("value2"),
+                                    isApp = isAppDrain
                                 )
                             )
                         }
@@ -106,9 +118,11 @@ fun WellbeingDashboardScreen() {
     // Provide some mock data if empty just to show the UI works initially
     val displayStats = if (batteryStats.isEmpty()) {
         listOf(
-            BatteryStat("Screen", 500.0, 1000.0),
-            BatteryStat("CPU", 300.0, 500.0),
-            BatteryStat("Wi-Fi", 150.0, 200.0)
+            BatteryStat("Screen", 500.0, 1000.0, isApp = false),
+            BatteryStat("CPU", 300.0, 500.0, isApp = false),
+            BatteryStat("Wi-Fi", 150.0, 200.0, isApp = false),
+            BatteryStat("com.android.chrome", 250.0, 0.0, isApp = true),
+            BatteryStat("APP|10234|com.instagram.android", 450.0, 0.0, isApp = true)
         )
     } else {
         batteryStats
@@ -142,7 +156,15 @@ fun BatteryBarChart(batteryData: List<BatteryStat>) {
         val index = value.toInt()
         if (index >= 0 && index < topDrainers.size) {
             // Truncate long names so they fit on the screen
-            topDrainers[index].title.take(10)
+            var titleStr = topDrainers[index].title
+            // Quick cleanup for "APP|..." prefix for the chart
+            if (titleStr.startsWith("APP|")) {
+                val parts = titleStr.split("|")
+                if (parts.size >= 3) {
+                    titleStr = parts[2]
+                }
+            }
+            titleStr.take(10)
         } else {
             ""
         }
@@ -197,18 +219,42 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 2. Battery Consumers List
-            Text(
-                text = "Battery Consumers",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
+            // --- Categorized Lists ---
 
-            Spacer(modifier = Modifier.height(8.dp))
+            val appStats = batteryData.filter { it.isApp }.sortedByDescending { it.value1 }
+            val hardwareStats = batteryData.filter { !it.isApp }.sortedByDescending { it.value1 }
 
-            LazyColumn {
-                items(batteryData) { stat ->
-                    AppUsageLimitItem(stat)
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                // Section: App Drain
+                if (appStats.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "App Usage",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(appStats) { stat ->
+                        AppUsageLimitItem(stat) // Reusing your existing item UI
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(16.dp)) }
+
+                // Section: Hardware Drain
+                if (hardwareStats.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Hardware & System",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.tertiary, // Different color for distinction
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(hardwareStats) { stat ->
+                        AppUsageLimitItem(stat)
+                    }
                 }
             }
         }
@@ -217,8 +263,17 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>) {
 
 @Composable
 fun AppUsageLimitItem(stat: BatteryStat) {
+    // Quick cleanup for "APP|uid|package" prefix for display
+    var displayTitle = stat.title
+    if (displayTitle.startsWith("APP|")) {
+        val parts = displayTitle.split("|")
+        if (parts.size >= 3) {
+            displayTitle = parts[2]
+        }
+    }
+
     ListItem(
-        headlineContent = { Text(stat.title) },
+        headlineContent = { Text(displayTitle) },
         supportingContent = { Text("Drain: \${String.format("%.2f", stat.value1)} mAh") },
         trailingContent = {
             OutlinedButton(onClick = { /* Open Dialog */ }) {
