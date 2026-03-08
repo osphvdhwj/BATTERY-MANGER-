@@ -1,10 +1,14 @@
 package com.crdroid.batterywellbeing
 
+import android.app.AppOpsManager
+import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.os.Process
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -16,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
+import java.util.Calendar
 
 // Vico Imports
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
@@ -32,8 +37,51 @@ data class BatteryStat(
     val title: String,
     val value1: Double,
     val value2: Double,
-    val isApp: Boolean = false // New flag to categorize
+    val isApp: Boolean = false,
+    var screenTimeMs: Long = 0L // NEW: Holds daily screen time
 )
+
+// Helpers
+fun hasUsageStatsPermission(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val mode = appOps.unsafeCheckOpNoThrow(
+        AppOpsManager.OPSTR_GET_USAGE_STATS,
+        Process.myUid(),
+        context.packageName
+    )
+    return mode == AppOpsManager.MODE_ALLOWED
+}
+
+fun getDailyScreenTime(context: Context): Map<String, Long> {
+    if (!hasUsageStatsPermission(context)) return emptyMap()
+
+    val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+
+    val calendar = Calendar.getInstance()
+    calendar.set(Calendar.HOUR_OF_DAY, 0)
+    calendar.set(Calendar.MINUTE, 0)
+    calendar.set(Calendar.SECOND, 0)
+    val startTime = calendar.timeInMillis
+    val endTime = System.currentTimeMillis()
+
+    val stats = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
+
+    val screenTimeMap = mutableMapOf<String, Long>()
+    for ((packageName, usageStat) in stats) {
+        if (usageStat.totalTimeInForeground > 0) {
+            screenTimeMap[packageName] = usageStat.totalTimeInForeground
+        }
+    }
+    return screenTimeMap
+}
+
+fun formatScreenTime(timeMs: Long): String {
+    if (timeMs == 0L) return "0m"
+    val minutes = (timeMs / (1000 * 60)) % 60
+    val hours = (timeMs / (1000 * 60 * 60))
+    return if (hours > 0) "\${hours}h \${minutes}m" else "\${minutes}m"
+}
+
 
 class MainActivity : ComponentActivity() {
 
@@ -72,8 +120,6 @@ fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
                             val obj = jsonArray.getJSONObject(i)
                             val title = obj.getString("title")
 
-                            // Hardware components are usually explicitly named.
-                            // Anything resembling an app package (com.xxx) or an APP| prefix is an app.
                             val isAppDrain = title.contains(".") || title.startsWith("APP|")
 
                             statsList.add(
@@ -107,11 +153,32 @@ fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
 // 3. Connecting it to the UI
 @Composable
 fun WellbeingDashboardScreen() {
+    val context = LocalContext.current
     var batteryStats by remember { mutableStateOf<List<BatteryStat>>(emptyList()) }
+    var screenTimeMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
-    // This listens for the system broadcast silently in the background
+    // Fetch Screen Time whenever the UI recomposes
+    LaunchedEffect(Unit) {
+        screenTimeMap = getDailyScreenTime(context)
+    }
+
+    // Merge battery data with screen time data
     BatteryStatsReceiver { newStats ->
-        batteryStats = newStats
+        val mergedStats = newStats.map { stat ->
+            // Try to extract pure package name for mapping
+            var pkgName = stat.title
+            if (pkgName.startsWith("APP|")) {
+                val parts = pkgName.split("|")
+                if (parts.size >= 3) {
+                    pkgName = parts[2]
+                }
+            }
+
+            // If the title is a package name, try to fetch its screen time
+            val time = screenTimeMap[pkgName] ?: 0L
+            stat.copy(screenTimeMs = time)
+        }
+        batteryStats = mergedStats
     }
 
     // Pass the state to the UI layout
@@ -121,14 +188,48 @@ fun WellbeingDashboardScreen() {
             BatteryStat("Screen", 500.0, 1000.0, isApp = false),
             BatteryStat("CPU", 300.0, 500.0, isApp = false),
             BatteryStat("Wi-Fi", 150.0, 200.0, isApp = false),
-            BatteryStat("com.android.chrome", 250.0, 0.0, isApp = true),
-            BatteryStat("APP|10234|com.instagram.android", 450.0, 0.0, isApp = true)
+            BatteryStat("com.android.chrome", 250.0, 0.0, isApp = true, screenTimeMs = 3600000L),
+            BatteryStat("APP|10234|com.instagram.android", 450.0, 0.0, isApp = true, screenTimeMs = 5400000L)
         )
     } else {
         batteryStats
     }
 
-    WellbeingDashboard(displayStats)
+    WellbeingDashboard(displayStats, context)
+}
+
+@Composable
+fun PermissionBanner(context: Context) {
+    var hasPermission by remember { mutableStateOf(hasUsageStatsPermission(context)) }
+
+    if (!hasPermission) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Usage Access Required",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "To view Screen Time, please grant Usage Data Access in Settings.",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onErrorContainer)
+                ) {
+                    Text("Grant Permission", color = MaterialTheme.colorScheme.errorContainer)
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -193,11 +294,11 @@ fun BatteryBarChart(batteryData: List<BatteryStat>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WellbeingDashboard(batteryData: List<BatteryStat>) {
+fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context) {
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text("Battery Wellbeing") }
+                title = { Text("Digital Wellbeing") }
             )
         }
     ) { padding ->
@@ -207,6 +308,9 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>) {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
+            // Show the permission request if needed
+            PermissionBanner(context)
+
             // 1. The Main Chart
             Card(
                 modifier = Modifier
@@ -273,8 +377,12 @@ fun AppUsageLimitItem(stat: BatteryStat) {
     }
 
     ListItem(
-        headlineContent = { Text(displayTitle) },
-        supportingContent = { Text("Drain: \${String.format("%.2f", stat.value1)} mAh") },
+        headlineContent = { Text(displayTitle, maxLines = 1) },
+        supportingContent = {
+            val drainText = "Drain: \${String.format("%.2f", stat.value1)} mAh"
+            val timeText = if (stat.screenTimeMs > 0) " • Time: \${formatScreenTime(stat.screenTimeMs)}" else ""
+            Text(drainText + timeText)
+        },
         trailingContent = {
             OutlinedButton(onClick = { /* Open Dialog */ }) {
                 Text("Details")
