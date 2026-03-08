@@ -77,12 +77,25 @@ class XposedInit : IXposedHookLoadPackage {
                                             ModuleConfig.enableHotspotLimits = intent.getBooleanExtra("enableHotspotLimits", true)
                                             ModuleConfig.hotspotDataLimitMB = intent.getIntExtra("hotspotDataLimitMB", 500)
                                             ModuleConfig.dropAggressiveClients = intent.getBooleanExtra("dropAggressiveClients", true)
+                                        } else if (intent.action == "com.crdroid.batterywellbeing.UPDATE_EXEMPTIONS") {
+                                            val jsonStr = intent.getStringExtra("exemptions_json") ?: "[]"
+                                            val set = mutableSetOf<String>()
+                                            try {
+                                                val array = JSONArray(jsonStr)
+                                                for (i in 0 until array.length()) {
+                                                    set.add(array.getString(i))
+                                                }
+                                            } catch (e: Exception) { }
+                                            ModuleConfig.exemptedApps = set
+                                            de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: Exemptions updated. Loaded ${set.size} apps.")
 
                                             de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: Module settings updated from App UI.")
                                         }
                                     }
                                 }
-                                val filter = android.content.IntentFilter("com.crdroid.batterywellbeing.UPDATE_SETTINGS")
+                                val filter = android.content.IntentFilter()
+                                filter.addAction("com.crdroid.batterywellbeing.UPDATE_SETTINGS")
+                                filter.addAction("com.crdroid.batterywellbeing.UPDATE_EXEMPTIONS")
                                 context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_EXPORTED)
                                 XposedHelpers.setAdditionalInstanceField(serviceInstance, "receiverRegistered", true)
                             }

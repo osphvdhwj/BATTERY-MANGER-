@@ -156,11 +156,16 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var showSettings by remember { mutableStateOf(false) }
+                    var showExemptions by remember { mutableStateOf(false) }
 
                     if (showSettings) {
-                        SettingsScreen(prefs, this) { showSettings = false }
+                        SettingsScreen(prefs, this, onNavigateBack = { showSettings = false }, onShowExemptions = { showExemptions = true })
                     } else {
                         WellbeingDashboardScreen(prefs) { showSettings = true }
+
+                    if (showExemptions) {
+                        ExemptionsDialog(prefs) { showExemptions = false }
+                    }
                     }
                 }
             }
@@ -472,7 +477,7 @@ fun AppUsageLimitItem(stat: BatteryStat) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: () -> Unit) {
+fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: () -> Unit, onShowExemptions: () -> Unit) {
     // 🔋 Battery States
     var smartCharge by remember { mutableStateOf(prefs.getBoolean("enableSmartCharge", true)) }
     var smartChargePercent by remember { mutableStateOf(prefs.getInt("smartChargeLimitPercent", 80).toFloat()) }
@@ -584,7 +589,7 @@ fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: (
                 }
             }
             item {
-                OutlinedButton(onClick = { /* TODO: Open App Exemption List */ }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                OutlinedButton(onClick = onShowExemptions, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Text("Manage Heavy Workload Exemptions")
                 }
             }
