@@ -48,7 +48,8 @@ object StorageAbuseHook {
                                     // args map: [uid, fgCharsRead, fgCharsWrite, fgBytesRead, fgBytesWrite, bgCharsRead, bgCharsWrite, bgBytesRead, bgBytesWrite, fgFsync, bgFsync]
                                     val bgBytesWrite = args[8] as Long
 
-                                    if (bgBytesWrite > BACKGROUND_WRITE_THRESHOLD_BYTES) {
+                                    val dynamicLimit = ModuleConfig.storageThresholdMB * 1024 * 1024L
+                                    if (bgBytesWrite > dynamicLimit) {
                                         val pm = context.packageManager
                                         val packages = pm.getPackagesForUid(uid)
                                         if (!packages.isNullOrEmpty()) {

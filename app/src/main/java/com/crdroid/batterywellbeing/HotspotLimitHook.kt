@@ -91,7 +91,8 @@ object HotspotLimitHook {
                         activeClients[mac] = bytesUsed
 
                         // Check against quota
-                        if (ModuleConfig.enableHotspotLimits && bytesUsed > DATA_LIMIT_BYTES) {
+                        val dynamicLimit = ModuleConfig.hotspotDataLimitMB * 1024 * 1024L
+                        if (ModuleConfig.enableHotspotLimits && bytesUsed > dynamicLimit) {
                             XposedBridge.log("BatteryWellbeing: Client \$mac exceeded limit. Terminating connection.")
                             kickClient(mac)
                         }

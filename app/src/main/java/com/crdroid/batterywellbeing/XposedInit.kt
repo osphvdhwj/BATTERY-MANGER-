@@ -61,10 +61,22 @@ class XposedInit : IXposedHookLoadPackage {
                                     override fun onReceive(ctx: android.content.Context, intent: android.content.Intent) {
                                         if (intent.action == "com.crdroid.batterywellbeing.UPDATE_SETTINGS") {
                                             ModuleConfig.enableSmartCharge = intent.getBooleanExtra("enableSmartCharge", true)
+                                            ModuleConfig.smartChargeLimitPercent = intent.getIntExtra("smartChargeLimitPercent", 80)
+
                                             ModuleConfig.enableThermalWarnings = intent.getBooleanExtra("enableThermalWarnings", true)
+                                            ModuleConfig.thermalWarningThresholdC = intent.getIntExtra("thermalWarningThresholdC", 42)
+
                                             ModuleConfig.enableRogueApp = intent.getBooleanExtra("enableRogueApp", true)
                                             ModuleConfig.enableStorageAbuse = intent.getBooleanExtra("enableStorageAbuse", true)
+                                            ModuleConfig.storageThresholdMB = intent.getIntExtra("storageThresholdMB", 500)
+
+                                            ModuleConfig.enableAppTimers = intent.getBooleanExtra("enableAppTimers", false)
+                                            ModuleConfig.enforceBedtimeMode = intent.getBooleanExtra("enforceBedtimeMode", false)
+
                                             ModuleConfig.enableHotspotLimits = intent.getBooleanExtra("enableHotspotLimits", true)
+                                            ModuleConfig.hotspotDataLimitMB = intent.getIntExtra("hotspotDataLimitMB", 500)
+                                            ModuleConfig.dropAggressiveClients = intent.getBooleanExtra("dropAggressiveClients", true)
+
                                             de.robv.android.xposed.XposedBridge.log("BatteryWellbeing: Module settings updated from App UI.")
                                         }
                                     }
@@ -83,18 +95,20 @@ class XposedInit : IXposedHookLoadPackage {
                             // --- DYNAMIC ISLAND TRIGGERS ---
 
                             // Smart Charge Limit (e.g., holding at 80% while plugged in)
-                            if (ModuleConfig.enableSmartCharge && currentLevel == 80 && plugType != 0 && lastNotifiedLevel != 80) {
+                            val chargeLimit = ModuleConfig.smartChargeLimitPercent
+                            if (ModuleConfig.enableSmartCharge && currentLevel == chargeLimit && plugType != 0 && lastNotifiedLevel != chargeLimit) {
                                 IslandDispatcher.dispatchEvent(context, "SMART_CHARGE_LIMIT", currentLevel)
                                 lastNotifiedLevel = currentLevel
-                            } else if (currentLevel != 80) {
+                            } else if (currentLevel != chargeLimit) {
                                 lastNotifiedLevel = currentLevel // Reset
                             }
 
                             // Thermal Throttling Warning (Over 42°C)
-                            if (ModuleConfig.enableThermalWarnings && batteryTemp >= 42 && batteryTemp != lastNotifiedTemp) {
+                            val thermalLimit = ModuleConfig.thermalWarningThresholdC
+                            if (ModuleConfig.enableThermalWarnings && batteryTemp >= thermalLimit && batteryTemp != lastNotifiedTemp) {
                                 IslandDispatcher.dispatchEvent(context, "THERMAL_WARNING", currentLevel, "\$batteryTemp°C")
                                 lastNotifiedTemp = batteryTemp
-                            } else if (batteryTemp < 40) {
+                            } else if (batteryTemp < thermalLimit - 2) {
                                 lastNotifiedTemp = 0 // Reset when cooled down
                             }
 

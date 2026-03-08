@@ -458,66 +458,158 @@ fun AppUsageLimitItem(stat: BatteryStat) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(prefs: SharedPreferences, context: Context, onNavigateBack: () -> Unit) {
-    // Load states
+    // 🔋 Battery States
     var smartCharge by remember { mutableStateOf(prefs.getBoolean("enableSmartCharge", true)) }
-    var thermalWarn by remember { mutableStateOf(prefs.getBoolean("enableThermalWarnings", true)) }
+    var smartChargePercent by remember { mutableStateOf(prefs.getInt("smartChargeLimitPercent", 80).toFloat()) }
+    var thermalThreshold by remember { mutableStateOf(prefs.getInt("thermalWarningThresholdC", 42).toFloat()) }
+
+    // 🛡️ Storage & Background
     var rogueApp by remember { mutableStateOf(prefs.getBoolean("enableRogueApp", true)) }
     var storageAbuse by remember { mutableStateOf(prefs.getBoolean("enableStorageAbuse", true)) }
-    var hotspotLimits by remember { mutableStateOf(prefs.getBoolean("enableHotspotLimits", true)) }
+    var storageAbuseLimitMB by remember { mutableStateOf(prefs.getInt("storageThresholdMB", 500).toFloat()) }
 
-    // Broadcast helper
+    // ⏱️ Wellbeing States
+    var enableAppTimers by remember { mutableStateOf(prefs.getBoolean("enableAppTimers", false)) }
+    var bedtimeMode by remember { mutableStateOf(prefs.getBoolean("enforceBedtimeMode", false)) }
+
+    // 📡 Hotspot States
+    var hotspotLimit by remember { mutableStateOf(prefs.getBoolean("enableHotspotLimits", true)) }
+    var hotspotDataMB by remember { mutableStateOf(prefs.getInt("hotspotDataLimitMB", 500).toFloat()) }
+    var dropAggressiveClients by remember { mutableStateOf(prefs.getBoolean("dropAggressiveClients", true)) }
+
+    // Broadcast helper to send everything to system_server
     fun saveAndBroadcast() {
-        prefs.edit()
-            .putBoolean("enableSmartCharge", smartCharge)
-            .putBoolean("enableThermalWarnings", thermalWarn)
-            .putBoolean("enableRogueApp", rogueApp)
-            .putBoolean("enableStorageAbuse", storageAbuse)
-            .putBoolean("enableHotspotLimits", hotspotLimits)
-            .apply()
+        prefs.edit().apply {
+            putBoolean("enableSmartCharge", smartCharge)
+            putInt("smartChargeLimitPercent", smartChargePercent.toInt())
+            putBoolean("enableThermalWarnings", thermalThreshold > 0)
+            putInt("thermalWarningThresholdC", thermalThreshold.toInt())
+
+            putBoolean("enableRogueApp", rogueApp)
+            putBoolean("enableStorageAbuse", storageAbuse)
+            putInt("storageThresholdMB", storageAbuseLimitMB.toInt())
+
+            putBoolean("enableAppTimers", enableAppTimers)
+            putBoolean("enforceBedtimeMode", bedtimeMode)
+
+            putBoolean("enableHotspotLimits", hotspotLimit)
+            putInt("hotspotDataLimitMB", hotspotDataMB.toInt())
+            putBoolean("dropAggressiveClients", dropAggressiveClients)
+        }.apply()
 
         val intent = Intent("com.crdroid.batterywellbeing.UPDATE_SETTINGS").apply {
             putExtra("enableSmartCharge", smartCharge)
-            putExtra("enableThermalWarnings", thermalWarn)
+            putExtra("smartChargeLimitPercent", smartChargePercent.toInt())
+            putExtra("enableThermalWarnings", thermalThreshold > 0)
+            putExtra("thermalWarningThresholdC", thermalThreshold.toInt())
+
             putExtra("enableRogueApp", rogueApp)
             putExtra("enableStorageAbuse", storageAbuse)
-            putExtra("enableHotspotLimits", hotspotLimits)
+            putExtra("storageThresholdMB", storageAbuseLimitMB.toInt())
+
+            putExtra("enableAppTimers", enableAppTimers)
+            putExtra("enforceBedtimeMode", bedtimeMode)
+
+            putExtra("enableHotspotLimits", hotspotLimit)
+            putExtra("hotspotDataLimitMB", hotspotDataMB.toInt())
+            putExtra("dropAggressiveClients", dropAggressiveClients)
         }
         context.sendBroadcast(intent)
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Module Settings") },
+            LargeTopAppBar(
+                title = { Text("Ecosystem Control") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Text("←", style = MaterialTheme.typography.titleLarge) // Simple back arrow
-                    }
+                    IconButton(onClick = onNavigateBack) { Text("←", style = MaterialTheme.typography.titleLarge) }
                 }
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-            Text("Dynamic Island Triggers", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(8.dp))
+        LazyColumn(modifier = Modifier.padding(padding).fillMaxSize().padding(horizontal = 16.dp)) {
 
-            SettingToggle("Smart Charge Limit Alerts", smartCharge) { smartCharge = it; saveAndBroadcast() }
-            SettingToggle("Thermal Throttling Warnings", thermalWarn) { thermalWarn = it; saveAndBroadcast() }
-            SettingToggle("Rogue App Drain Detection", rogueApp) { rogueApp = it; saveAndBroadcast() }
-            SettingToggle("Background Storage Abuse", storageAbuse) { storageAbuse = it; saveAndBroadcast() }
-            SettingToggle("Hotspot Per-Connection Limits", hotspotLimits) { hotspotLimits = it; saveAndBroadcast() }
+            // --- SECTION: HARDWARE & BATTERY ---
+            item { SectionHeader("Hardware & Battery") }
+            item { SettingToggle("Smart Charge Limit", "Stop charging to protect battery health", smartCharge) { smartCharge = it; saveAndBroadcast() } }
+            if (smartCharge) {
+                item {
+                    SettingSlider("Charge Limit: \${smartChargePercent.toInt()}%", smartChargePercent, 50f..95f) {
+                        smartChargePercent = it; saveAndBroadcast()
+                    }
+                }
+            }
+            item {
+                SettingSlider("Thermal Warning Alert: \${thermalThreshold.toInt()}°C", thermalThreshold, 35f..50f) {
+                    thermalThreshold = it; saveAndBroadcast()
+                }
+            }
+
+            // --- SECTION: DIGITAL WELLBEING ---
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { SectionHeader("Digital Wellbeing") }
+            item { SettingToggle("Strict App Timers", "Force close apps when daily limit is reached", enableAppTimers) { enableAppTimers = it; saveAndBroadcast() } }
+            item { SettingToggle("Bedtime Mode Enforcer", "Aggressively kill media/game processes at night", bedtimeMode) { bedtimeMode = it; saveAndBroadcast() } }
+            item {
+                OutlinedButton(onClick = { /* TODO: Open per-app timer dialog */ }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text("Configure Per-App Time Limits")
+                }
+            }
+
+            // --- SECTION: BACKGROUND & STORAGE ---
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { SectionHeader("Background & Storage") }
+            item { SettingToggle("Rogue App Drain Detection", "Alert if apps abuse wakelocks", rogueApp) { rogueApp = it; saveAndBroadcast() } }
+            item { SettingToggle("Background Storage Abuse", "Alert if background apps thrash disk I/O", storageAbuse) { storageAbuse = it; saveAndBroadcast() } }
+            if (storageAbuse) {
+                item {
+                    SettingSlider("Write Limit: \${storageAbuseLimitMB.toInt()} MB", storageAbuseLimitMB, 100f..2000f) {
+                        storageAbuseLimitMB = it; saveAndBroadcast()
+                    }
+                }
+            }
+            item {
+                OutlinedButton(onClick = { /* TODO: Open App Exemption List */ }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text("Manage Heavy Workload Exemptions")
+                }
+            }
+
+            // --- SECTION: NETWORK & HOTSPOT ---
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { SectionHeader("Network & Tethering") }
+            item { SettingToggle("Per-Connection Hotspot Limit", "Drop clients exceeding data quotas", hotspotLimit) { hotspotLimit = it; saveAndBroadcast() } }
+            if (hotspotLimit) {
+                item {
+                    SettingSlider("Client Data Quota: \${hotspotDataMB.toInt()} MB", hotspotDataMB, 100f..2000f) {
+                        hotspotDataMB = it; saveAndBroadcast()
+                    }
+                }
+            }
         }
     }
 }
 
+// Reusable UI Components
 @Composable
-fun SettingToggle(title: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge)
+fun SectionHeader(title: String) {
+    Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 8.dp))
+}
+
+@Composable
+fun SettingToggle(title: String, subtitle: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Switch(checked = isChecked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+fun SettingSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onValueChange: (Float) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Slider(value = value, onValueChange = onValueChange, valueRange = range)
     }
 }
