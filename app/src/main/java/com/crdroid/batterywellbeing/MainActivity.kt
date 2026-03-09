@@ -176,6 +176,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var prefs: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Bootstrap the Heartbeat Service
+        val serviceIntent = Intent(this, HeartbeatTrackerService::class.java)
+        androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
+
         super.onCreate(savedInstanceState)
 
         prefs = getSharedPreferences("BatteryWellbeingPrefs", Context.MODE_PRIVATE)
@@ -288,7 +292,6 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
     }
 
     BatteryStatsReceiver { newStats ->
-        val enableAppTimers = prefs.getBoolean("enableAppTimers", false)
 
         val mergedStats = newStats.map { stat ->
             var pkgName = stat.title
@@ -307,21 +310,6 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
 
             val time = screenTimeMap[pkgName] ?: 0L
             val network = if (uid != -1) networkUsageMap[uid] else Pair(0L, 0L)
-
-            // Check for executioner logic
-            if (enableAppTimers && time > 0) {
-                // In a full implementation, we'd read `appTimeLimits` map.
-                // For now, if the limit exists in SharedPreferences, check it.
-                val limitMs = prefs.getLong("timer_$pkgName", -1L)
-                if (limitMs > 0 && time >= limitMs) {
-                    val intent = Intent(context, InterstitialShieldService::class.java).apply {
-                        putExtra("package_name", pkgName)
-                        // Hack: use a placeholder or app label here if available
-                        putExtra("app_name", stat.title)
-                    }
-                    context.startService(intent)
-                }
-            }
 
             stat.copy(
                 screenTimeMs = time,

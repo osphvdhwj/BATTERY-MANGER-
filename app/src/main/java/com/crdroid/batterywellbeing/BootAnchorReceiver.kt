@@ -43,6 +43,10 @@ class BootAnchorReceiver : BroadcastReceiver() {
             }
             context.sendBroadcast(timersIntent)
 
+            // 4. Bootstrap the Heartbeat Service
+            val serviceIntent = Intent(context, HeartbeatTrackerService::class.java)
+            androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
+
         }
     }
 }
