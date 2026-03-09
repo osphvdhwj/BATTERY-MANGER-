@@ -36,7 +36,7 @@ object RogueAppHook {
 
                             // Fire the Dynamic Island trigger!
                             if (ModuleConfig.enableRogueApp) {
-                                IslandDispatcher.dispatchEvent(context, "ROGUE_APP_DETECTED", 0, appName)
+                                IslandDispatcher.dispatchSystemAlert(context, "ROGUE_APP_DETECTED", "High Background Drain", "$appName is abusing system resources.", "#FF9800")
                             }
 
                             // 🚨 ELITE MOVE: Block the ugly default Android system notification
@@ -84,7 +84,7 @@ object RogueAppHook {
 
                             // Fire to the Island with the reason
                             if (ModuleConfig.enableRogueApp) {
-                                IslandDispatcher.dispatchEvent(context, "ROGUE_APP_DETECTED", 0, "\$appName (Phantom Processes)")
+                                IslandDispatcher.dispatchSystemAlert(context, "ROGUE_APP_DETECTED", "Phantom Processes Killed", "\$appName spawned abusive phantom threads.", "#FF9800")
                             }
 
                         } catch (e: Exception) {

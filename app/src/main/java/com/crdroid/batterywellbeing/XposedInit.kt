@@ -126,7 +126,7 @@ class XposedInit : IXposedHookLoadPackage {
                             // Smart Charge Limit (e.g., holding at 80% while plugged in)
                             val chargeLimit = ModuleConfig.smartChargeLimitPercent
                             if (ModuleConfig.enableSmartCharge && currentLevel == chargeLimit && plugType != 0 && lastNotifiedLevel != chargeLimit) {
-                                IslandDispatcher.dispatchEvent(context, "SMART_CHARGE_LIMIT", currentLevel)
+                                IslandDispatcher.dispatchSystemAlert(context, "SMART_CHARGE_LIMIT", "Smart Charge", "Battery held at ${currentLevel}% to protect health.", "#4CAF50")
                                 lastNotifiedLevel = currentLevel
                             } else if (currentLevel != chargeLimit) {
                                 lastNotifiedLevel = currentLevel // Reset
@@ -135,7 +135,7 @@ class XposedInit : IXposedHookLoadPackage {
                             // Thermal Throttling Warning (Over 42°C)
                             val thermalLimit = ModuleConfig.thermalWarningThresholdC
                             if (ModuleConfig.enableThermalWarnings && batteryTemp >= thermalLimit && batteryTemp != lastNotifiedTemp) {
-                                IslandDispatcher.dispatchEvent(context, "THERMAL_WARNING", currentLevel, "\$batteryTemp°C")
+                                IslandDispatcher.dispatchSystemAlert(context, "THERMAL_WARNING", "Thermal Alert", "Battery is running hot at \$batteryTemp°C.", "#F44336")
                                 lastNotifiedTemp = batteryTemp
                             } else if (batteryTemp < thermalLimit - 2) {
                                 lastNotifiedTemp = 0 // Reset when cooled down

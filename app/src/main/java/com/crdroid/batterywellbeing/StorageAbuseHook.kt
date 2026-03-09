@@ -60,12 +60,7 @@ object StorageAbuseHook {
 
                                             // Fire to Dynamic Island
                                             if (ModuleConfig.enableStorageAbuse) {
-                                                IslandDispatcher.dispatchEvent(
-                                                    context,
-                                                    "ROGUE_APP_DETECTED",
-                                                    0,
-                                                    "$appName (Storage Abuse: $formattedWrite)"
-                                                )
+                                                IslandDispatcher.dispatchSystemAlert(context, "STORAGE_ABUSE", "Storage Thrashing", "$appName wrote $formattedWrite in the background.", "#E91E63")
                                             }
                                         }
                                     }

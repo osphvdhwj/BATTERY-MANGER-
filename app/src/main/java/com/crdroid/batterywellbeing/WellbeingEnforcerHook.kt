@@ -51,12 +51,7 @@ object WellbeingEnforcerHook {
 
                                             // Notify the Dynamic Island that justice was served
                                             val appName = getAppName(context, targetPackage)
-                                            IslandDispatcher.dispatchEvent(
-                                                context,
-                                                "SYSTEM_ALERT",
-                                                0,
-                                                "Time's Up: \$appName has been paused for the day."
-                                            )
+                                            IslandDispatcher.dispatchSystemAlert(context, "EXECUTION_COMPLETE", "App Paused", "Time's up for $appName.", "#2196F3")
                                         } catch (e: Exception) {
                                             XposedBridge.log("WellbeingEnforcer Kill Failed: \${e.message}")
                                         }
