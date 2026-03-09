@@ -3,19 +3,18 @@ package com.crdroid.batterywellbeing
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.IBinder
-import kotlinx.coroutines.*
+import java.util.concurrent.TimeUnit
+import java.lang.reflect.Method
 import org.json.JSONObject
 
 class HeartbeatTrackerService : Service() {
-
-    private val job = SupervisorJob()
-    private val scope = CoroutineScope(Dispatchers.IO + job)
 
     // Keep track of which apps have already been hit with the shield to avoid spamming
     private val blockedAppsCache = mutableSetOf<String>()
@@ -45,14 +44,13 @@ class HeartbeatTrackerService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        // 1. Create the persistent notification to stay alive
         val channel = NotificationChannel("wellbeing_heartbeat", "Ecosystem Tracker", NotificationManager.IMPORTANCE_MIN)
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)
 
         val notification = Notification.Builder(this, "wellbeing_heartbeat")
-            .setContentTitle("Digital Wellbeing Active")
-            .setContentText("Monitoring ecosystem health...")
+            .setContentTitle("Redwood Ecosystem Active")
+            .setContentText("Event-driven telemetry engaged. Zero polling drain.")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
 
@@ -62,11 +60,11 @@ class HeartbeatTrackerService : Service() {
         val filter = IntentFilter("com.crdroid.batterywellbeing.TIMER_BREACHED")
         registerReceiver(timerReceiver, filter, Context.RECEIVER_EXPORTED)
 
-        // 2. Setup the event-driven hardware tracking
-        setupHardwareObservers()
+        // Bootstrapping our event-driven observers
+        registerAllAppObservers()
     }
 
-    private fun setupHardwareObservers() {
+    private fun registerAllAppObservers() {
         try {
             val prefs = getSharedPreferences("BatteryWellbeingPrefs", Context.MODE_PRIVATE)
             val enableAppTimers = prefs.getBoolean("enableAppTimers", false)
@@ -81,9 +79,9 @@ class HeartbeatTrackerService : Service() {
                     }
                 } catch (e: Exception) {}
 
-                for ((pkgName, limitMs) in existingTimers) {
-                    if (limitMs > 0) {
-                        registerHardwareObserver(pkgName, limitMs)
+                existingTimers.forEach { (packageName, timeLimitMs) ->
+                    if (timeLimitMs > 0) {
+                        registerHardwareObserver(packageName, timeLimitMs)
                     }
                 }
             }
@@ -93,22 +91,33 @@ class HeartbeatTrackerService : Service() {
     }
 
     private fun registerHardwareObserver(targetPackage: String, timeLimitMs: Long) {
-        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-        val observerId = targetPackage.hashCode()
-
-        val pendingIntent = android.app.PendingIntent.getBroadcast(
-            this,
-            observerId,
-            Intent("com.crdroid.batterywellbeing.TIMER_BREACHED").apply {
-                putExtra("package_name", targetPackage)
-            },
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // The OS tracks this natively with zero extra battery drain
         try {
-            val method = usm.javaClass.getMethod("registerAppUsageObserver", Int::class.javaPrimitiveType, Array<String>::class.java, Long::class.javaPrimitiveType, java.util.concurrent.TimeUnit::class.java, android.app.PendingIntent::class.java)
-            method.invoke(usm, observerId, arrayOf(targetPackage), timeLimitMs, java.util.concurrent.TimeUnit.MILLISECONDS, pendingIntent)
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE)
+            val observerId = targetPackage.hashCode()
+
+            // This intent fires ONLY when the user hits the time limit
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                observerId,
+                Intent("com.crdroid.batterywellbeing.TIMER_BREACHED").apply {
+                    setPackage(packageName) // Send to our own receiver to trigger the Island warning
+                    putExtra("package_name", targetPackage)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Safely invoke the hidden System API via reflection
+            val method: Method = usm.javaClass.getMethod(
+                "registerAppUsageObserver",
+                Int::class.javaPrimitiveType,
+                Array<String>::class.java,
+                Long::class.javaPrimitiveType,
+                TimeUnit::class.java,
+                PendingIntent::class.java
+            )
+
+            method.invoke(usm, observerId, arrayOf(targetPackage), timeLimitMs, TimeUnit.MILLISECONDS, pendingIntent)
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -127,6 +136,5 @@ class HeartbeatTrackerService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(timerReceiver)
-        job.cancel()
     }
 }
