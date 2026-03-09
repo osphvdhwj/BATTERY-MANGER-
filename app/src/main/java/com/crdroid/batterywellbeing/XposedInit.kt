@@ -39,6 +39,7 @@ class XposedInit : IXposedHookLoadPackage {
         StorageAbuseHook.initHooks(lpparam.classLoader)
         WellbeingEnforcerHook.initHooks(lpparam.classLoader)
         DisplayEngineHook.initHooks(lpparam.classLoader)
+        ActivityInterceptorHook.initHooks(lpparam.classLoader)
 
         try {
             val batteryServiceClass = "com.android.server.BatteryService"

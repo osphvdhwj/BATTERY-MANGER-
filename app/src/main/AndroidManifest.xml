@@ -17,6 +17,9 @@
         android:theme="@style/Theme.BatteryWellbeing">
 
         <service android:name=".InterstitialShieldService" android:exported="false" />
+        <service android:name=".RealityPillService" android:exported="false" />
+
+        <activity android:name=".ui.DeepBreathActivity" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <activity
             android:name=".MainActivity"
