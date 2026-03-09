@@ -23,6 +23,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import com.google.accompanist.drawablepainter.rememberDrawablePainter
+
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 import java.util.Calendar
@@ -482,8 +488,37 @@ fun AppUsageLimitItem(stat: BatteryStat) {
         }
     }
 
+    val context = LocalContext.current
+    val iconDrawable = remember(displayTitle) {
+        try {
+            context.packageManager.getApplicationIcon(displayTitle)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    val is60HzCapped = setOf("com.instagram.android", "com.zhiliaoapp.musically", "com.twitter.android").contains(displayTitle)
+    val isStorageMonitored = !ModuleConfig.exemptedApps.contains(displayTitle)
+
+    val titlePrefix = buildString {
+        if (is60HzCapped) append("[60Hz] ")
+        if (!isStorageMonitored) append("[Exempt] ")
+    }
+
     ListItem(
-        headlineContent = { Text(displayTitle, maxLines = 1) },
+        leadingContent = {
+            if (iconDrawable != null) {
+                Image(
+                    painter = rememberDrawablePainter(iconDrawable),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp)
+                )
+            } else {
+                // Fallback placeholder
+                Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondaryContainer))
+            }
+        },
+        headlineContent = { Text(titlePrefix + displayTitle, maxLines = 1) },
         supportingContent = {
             Column {
                 Text("Drain: ${String.format("%.2f", stat.value1)} mAh")

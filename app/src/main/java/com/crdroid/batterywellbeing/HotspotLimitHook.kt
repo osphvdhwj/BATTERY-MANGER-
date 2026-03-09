@@ -46,7 +46,7 @@ object HotspotLimitHook {
                                 // If it's a newly discovered MAC, inject the iptables accounting rule
                                 if (!activeClients.containsKey(macString)) {
                                     activeClients[macString] = 0L
-                                    injectIptablesRule(macString)
+                                    // injectIptablesRule(macString) // Deprecated: Replaced by future eBPF
                                     XposedBridge.log("BatteryWellbeing: New Hotspot Client -> \$macString. Tracking started.")
                                 }
                             }
@@ -62,7 +62,7 @@ object HotspotLimitHook {
             )
 
             // Start the background polling thread for iptables
-            startDataPollingThread()
+            // startDataPollingThread() // Deprecated: High battery drain
 
             XposedBridge.log("BatteryWellbeing: Hotspot Per-Connection Limits Engaged.")
 
@@ -93,7 +93,7 @@ object HotspotLimitHook {
                         // Check against quota
                         val dynamicLimit = ModuleConfig.hotspotDataLimitMB * 1024 * 1024L
                         if (ModuleConfig.enableHotspotLimits && bytesUsed > dynamicLimit) {
-                            XposedBridge.log("BatteryWellbeing: Client \$mac exceeded limit. Terminating connection.")
+                            XposedBridge.log("BatteryWellbeing: Client $mac exceeded limit. Terminating connection.")
                             kickClient(mac)
                         }
                     }

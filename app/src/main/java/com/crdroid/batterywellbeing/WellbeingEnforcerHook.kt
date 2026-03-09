@@ -65,7 +65,13 @@ object WellbeingEnforcerHook {
                             }
 
                             val filter = IntentFilter("com.crdroid.batterywellbeing.EXECUTE_KILL")
-                            context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+                            context.registerReceiver(
+                                receiver,
+                                filter,
+                                "android.permission.PACKAGE_USAGE_STATS",
+                                null,
+                                Context.RECEIVER_EXPORTED
+                            )
 
                             XposedBridge.log("BatteryWellbeing: Wellbeing Executioner is armed and ready.")
 
