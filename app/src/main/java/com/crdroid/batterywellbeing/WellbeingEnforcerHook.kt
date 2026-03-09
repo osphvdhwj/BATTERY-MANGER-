@@ -88,4 +88,12 @@ object WellbeingEnforcerHook {
             packageName
         }
     }
+
+    private fun getDefaultValueForType(type: Class<*>): Any? {
+        return when (type) {
+            Boolean::class.javaPrimitiveType -> false
+            Int::class.javaPrimitiveType -> 0
+            else -> null
+        }
+    }
 }

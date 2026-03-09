@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.IBinder
 import kotlinx.coroutines.*
 import org.json.JSONObject
@@ -17,6 +19,26 @@ class HeartbeatTrackerService : Service() {
 
     // Keep track of which apps have already been hit with the shield to avoid spamming
     private val blockedAppsCache = mutableSetOf<String>()
+
+    private val timerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            if (intent.action == "com.crdroid.batterywellbeing.TIMER_BREACHED") {
+                val pkgName = intent.getStringExtra("package_name") ?: return
+
+                if (!blockedAppsCache.contains(pkgName)) {
+                    blockedAppsCache.add(pkgName)
+
+                    // Time is up. Fire the Interstitial Shield
+                    val shieldIntent = Intent(this@HeartbeatTrackerService, InterstitialShieldService::class.java).apply {
+                        putExtra("package_name", pkgName)
+                        putExtra("app_name", getAppName(this@HeartbeatTrackerService, pkgName))
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startService(shieldIntent)
+                }
+            }
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -36,59 +58,59 @@ class HeartbeatTrackerService : Service() {
 
         startForeground(1, notification)
 
-        // 2. Start the tracking loop
-        startUsageTrackingLoop()
+        // Register receiver for native OS usage callbacks
+        val filter = IntentFilter("com.crdroid.batterywellbeing.TIMER_BREACHED")
+        registerReceiver(timerReceiver, filter, Context.RECEIVER_EXPORTED)
+
+        // 2. Setup the event-driven hardware tracking
+        setupHardwareObservers()
     }
 
-    private fun startUsageTrackingLoop() {
-        scope.launch {
-            while (isActive) {
+    private fun setupHardwareObservers() {
+        try {
+            val prefs = getSharedPreferences("BatteryWellbeingPrefs", Context.MODE_PRIVATE)
+            val enableAppTimers = prefs.getBoolean("enableAppTimers", false)
+
+            if (enableAppTimers) {
+                val savedJson = prefs.getString("app_timers_json", "{}") ?: "{}"
+                val existingTimers = mutableMapOf<String, Long>()
                 try {
-                    val prefs = getSharedPreferences("BatteryWellbeingPrefs", Context.MODE_PRIVATE)
-                    val enableAppTimers = prefs.getBoolean("enableAppTimers", false)
-
-                    if (enableAppTimers) {
-                        // Retrieve the stored app timers JSON
-                        val savedJson = prefs.getString("app_timers_json", "{}") ?: "{}"
-                        val existingTimers = mutableMapOf<String, Long>()
-                        try {
-                            val jsonObject = JSONObject(savedJson)
-                            jsonObject.keys().forEach { key ->
-                                existingTimers[key] = jsonObject.getLong(key)
-                            }
-                        } catch (e: Exception) {}
-
-                        if (existingTimers.isNotEmpty()) {
-                            // Get live screen time
-                            val screenTimeMap = getDailyScreenTime(this@HeartbeatTrackerService)
-
-                            for ((pkgName, limitMs) in existingTimers) {
-                                val timeUsed = screenTimeMap[pkgName] ?: 0L
-
-                                if (limitMs > 0 && timeUsed >= limitMs) {
-                                    if (!blockedAppsCache.contains(pkgName)) {
-                                        blockedAppsCache.add(pkgName)
-
-                                        // Time is up. Fire the Interstitial Shield
-                                        val intent = Intent(this@HeartbeatTrackerService, InterstitialShieldService::class.java).apply {
-                                            putExtra("package_name", pkgName)
-                                            putExtra("app_name", getAppName(this@HeartbeatTrackerService, pkgName))
-                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                        }
-                                        startService(intent)
-                                    }
-                                } else if (timeUsed < limitMs && blockedAppsCache.contains(pkgName)) {
-                                    // If timer was extended, unblock
-                                    blockedAppsCache.remove(pkgName)
-                                }
-                            }
-                        }
+                    val jsonObject = JSONObject(savedJson)
+                    jsonObject.keys().forEach { key ->
+                        existingTimers[key] = jsonObject.getLong(key)
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                } catch (e: Exception) {}
+
+                for ((pkgName, limitMs) in existingTimers) {
+                    if (limitMs > 0) {
+                        registerHardwareObserver(pkgName, limitMs)
+                    }
                 }
-                delay(5000) // Check every 5 seconds
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun registerHardwareObserver(targetPackage: String, timeLimitMs: Long) {
+        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val observerId = targetPackage.hashCode()
+
+        val pendingIntent = android.app.PendingIntent.getBroadcast(
+            this,
+            observerId,
+            Intent("com.crdroid.batterywellbeing.TIMER_BREACHED").apply {
+                putExtra("package_name", targetPackage)
+            },
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // The OS tracks this natively with zero extra battery drain
+        try {
+            val method = usm.javaClass.getMethod("registerAppUsageObserver", Int::class.javaPrimitiveType, Array<String>::class.java, Long::class.javaPrimitiveType, java.util.concurrent.TimeUnit::class.java, android.app.PendingIntent::class.java)
+            method.invoke(usm, observerId, arrayOf(targetPackage), timeLimitMs, java.util.concurrent.TimeUnit.MILLISECONDS, pendingIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -104,6 +126,7 @@ class HeartbeatTrackerService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(timerReceiver)
         job.cancel()
     }
 }

@@ -19,7 +19,7 @@ object IslandDispatcher {
             putExtra("message", message)
             putExtra("colorHex", colorHex)
         }
-        context.sendBroadcast(intent)
+        context.sendBroadcast(intent, "com.crdroid.batterywellbeing.SECURE_IPC")
     }
 
     // 2. The 60-Second Execution Warning
@@ -29,7 +29,7 @@ object IslandDispatcher {
             putExtra("package_name", targetPackage)
             putExtra("app_name", appName)
         }
-        context.sendBroadcast(intent)
+        context.sendBroadcast(intent, "com.crdroid.batterywellbeing.SECURE_IPC")
     }
 
     // 3. Reality Pill Live Data Sync (Tick every minute during heavy sessions)
@@ -39,7 +39,7 @@ object IslandDispatcher {
             putExtra("app_name", appName)
             putExtra("session_minutes", sessionMinutes)
         }
-        context.sendBroadcast(intent)
+        context.sendBroadcast(intent, "com.crdroid.batterywellbeing.SECURE_IPC")
     }
 
     // 4. Config Sync (App Timers & Exemptions)
@@ -52,6 +52,6 @@ object IslandDispatcher {
             putExtra("timers_json", jsonPayload.toString())
             putExtra("exemptions_csv", exemptedApps.joinToString(","))
         }
-        context.sendBroadcast(intent)
+        context.sendBroadcast(intent, "com.crdroid.batterywellbeing.SECURE_IPC")
     }
 }
