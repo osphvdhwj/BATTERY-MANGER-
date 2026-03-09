@@ -14,13 +14,11 @@ object WellbeingEnforcerHook {
     fun initHooks(classLoader: ClassLoader) {
         try {
             // We piggyback on ActivityManagerService's systemReady to register our Executioner receiver
-            val amsClass = "com.android.server.am.ActivityManagerService"
+            val amsClass = XposedHelpers.findClass("com.android.server.am.ActivityManagerService", classLoader)
 
-            XposedHelpers.findAndHookMethod(
+            XposedBridge.hookAllMethods(
                 amsClass,
-                classLoader,
                 "systemReady",
-                Runnable::class.java,
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         try {

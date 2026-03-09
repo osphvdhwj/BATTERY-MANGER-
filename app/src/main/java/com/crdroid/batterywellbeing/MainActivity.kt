@@ -32,6 +32,9 @@ import com.google.accompanist.drawablepainter.rememberDrawablePainter
 
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
+import com.crdroid.batterywellbeing.ui.theme.BatteryWellbeingTheme
+import com.crdroid.batterywellbeing.ui.WellbeingDashboardScreen
+import com.crdroid.batterywellbeing.ui.AppUsageItem
 import java.util.Calendar
 
 // Vico Imports
@@ -203,7 +206,15 @@ class MainActivity : ComponentActivity() {
                             onShowTimeLimits = { showTimeLimitSheet = true }
                         )
                     } else {
-                        WellbeingDashboardScreen(prefs) { showSettings = true }
+                        WellbeingDashboardHost(prefs) { action ->
+                            when (action) {
+                                "Configure App Timers" -> showTimeLimitSheet = true
+                                "Exemptions" -> showExemptions = true
+                                "Settings" -> showSettings = true
+                                "Thermal Settings" -> showSettings = true
+                                "Manage Hotspot Limits" -> showSettings = true
+                            }
+                        }
                     }
 
                     if (showExemptions) {
@@ -278,7 +289,7 @@ fun BatteryStatsReceiver(onStatsUpdated: (List<BatteryStat>) -> Unit) {
 }
 
 @Composable
-fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Unit) {
+fun WellbeingDashboardHost(prefs: SharedPreferences, onActionClick: (String) -> Unit) {
     val context = LocalContext.current
     var batteryStats by remember { mutableStateOf<List<BatteryStat>>(emptyList()) }
     var screenTimeMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
@@ -322,9 +333,6 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
 
     val displayStats = if (batteryStats.isEmpty()) {
         listOf(
-            BatteryStat("Screen", 500.0, 1000.0, isApp = false),
-            BatteryStat("CPU", 300.0, 500.0, isApp = false),
-            BatteryStat("Wi-Fi", 150.0, 200.0, isApp = false),
             BatteryStat("com.android.chrome", 250.0, 0.0, isApp = true, screenTimeMs = 3600000L, wifiBytes = 500000000L, mobileBytes = 150000000L),
             BatteryStat("APP|10234|com.instagram.android", 450.0, 0.0, isApp = true, screenTimeMs = 5400000L, wifiBytes = 1200000000L, mobileBytes = 0L)
         )
@@ -332,7 +340,32 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
         batteryStats
     }
 
-    WellbeingDashboard(displayStats, context, unlockCount, onSettingsClick)
+    val appUsageItems = displayStats.filter { it.isApp }.map { stat ->
+        var pkgName = stat.title
+        if (pkgName.startsWith("APP|")) {
+            val parts = pkgName.split("|")
+            if (parts.size >= 3) {
+                pkgName = parts[2]
+            }
+        }
+
+        AppUsageItem(
+            packageName = pkgName,
+            name = pkgName, // In reality, resolve with getAppName
+            iconUrl = pkgName,
+            screenTimeMs = stat.screenTimeMs,
+            batteryDrainMah = stat.value1.toInt(),
+            is60HzCapped = setOf("com.instagram.android", "com.zhiliaoapp.musically", "com.twitter.android").contains(pkgName),
+            isStorageMonitored = !ModuleConfig.exemptedApps.contains(pkgName)
+        )
+    }.sortedByDescending { it.screenTimeMs }
+
+    WellbeingDashboardScreen(
+        appUsageList = appUsageItems,
+        totalScreenTimeMs = appUsageItems.sumOf { it.screenTimeMs },
+        dailyGoalMs = 8L * 60 * 60 * 1000, // 8 Hours Goal
+        onActionClick = onActionClick
+    )
 }
 
 @Composable
