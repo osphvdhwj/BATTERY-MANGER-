@@ -2,6 +2,7 @@ package com.crdroid.batterywellbeing
 
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
+import android.app.usage.UsageEvents
 import android.app.usage.NetworkStatsManager
 import android.app.usage.NetworkStats
 import android.content.BroadcastReceiver
@@ -62,6 +63,30 @@ fun hasUsageStatsPermission(context: Context): Boolean {
         context.packageName
     )
     return mode == AppOpsManager.MODE_ALLOWED
+}
+
+fun getDailyUnlockCount(context: Context): Int {
+    if (!hasUsageStatsPermission(context)) return 0
+
+    val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    val calendar = Calendar.getInstance()
+    calendar.set(Calendar.HOUR_OF_DAY, 0)
+    calendar.set(Calendar.MINUTE, 0)
+    calendar.set(Calendar.SECOND, 0)
+    val startTime = calendar.timeInMillis
+    val endTime = System.currentTimeMillis()
+
+    val events = usm.queryEvents(startTime, endTime)
+    val event = UsageEvents.Event()
+    var unlockCount = 0
+
+    while (events.hasNextEvent()) {
+        events.getNextEvent(event)
+        if (event.eventType == UsageEvents.Event.KEYGUARD_HIDDEN) {
+            unlockCount++
+        }
+    }
+    return unlockCount
 }
 
 fun getDailyScreenTime(context: Context): Map<String, Long> {
@@ -254,10 +279,12 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
     var batteryStats by remember { mutableStateOf<List<BatteryStat>>(emptyList()) }
     var screenTimeMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var networkUsageMap by remember { mutableStateOf<Map<Int, Pair<Long, Long>>>(emptyMap()) }
+    var unlockCount by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         screenTimeMap = getDailyScreenTime(context)
         networkUsageMap = getDailyNetworkUsage(context)
+        unlockCount = getDailyUnlockCount(context)
     }
 
     BatteryStatsReceiver { newStats ->
@@ -287,10 +314,12 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
                 // For now, if the limit exists in SharedPreferences, check it.
                 val limitMs = prefs.getLong("timer_$pkgName", -1L)
                 if (limitMs > 0 && time >= limitMs) {
-                    val intent = Intent("com.crdroid.batterywellbeing.EXECUTE_KILL").apply {
+                    val intent = Intent(context, InterstitialShieldService::class.java).apply {
                         putExtra("package_name", pkgName)
+                        // Hack: use a placeholder or app label here if available
+                        putExtra("app_name", stat.title)
                     }
-                    context.sendBroadcast(intent)
+                    context.startService(intent)
                 }
             }
 
@@ -315,7 +344,7 @@ fun WellbeingDashboardScreen(prefs: SharedPreferences, onSettingsClick: () -> Un
         batteryStats
     }
 
-    WellbeingDashboard(displayStats, context, onSettingsClick)
+    WellbeingDashboard(displayStats, context, unlockCount, onSettingsClick)
 }
 
 @Composable
@@ -408,7 +437,7 @@ fun BatteryBarChart(batteryData: List<BatteryStat>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context, onSettingsClick: () -> Unit) {
+fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context, unlockCount: Int, onSettingsClick: () -> Unit) {
     Scaffold(
         topBar = {
             LargeTopAppBar(
@@ -428,6 +457,10 @@ fun WellbeingDashboard(batteryData: List<BatteryStat>, context: Context, onSetti
                 .padding(16.dp)
         ) {
             PermissionBanner(context)
+
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Daily Unlocks: $unlockCount", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            }
 
             Card(
                 modifier = Modifier
