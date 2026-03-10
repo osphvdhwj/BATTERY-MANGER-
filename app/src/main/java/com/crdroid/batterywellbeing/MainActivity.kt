@@ -134,7 +134,7 @@ fun WellbeingDashboardHost(prefs: SharedPreferences, onActionClick: (String) -> 
                 }
             }
         }
-        context.registerReceiver(receiver, IntentFilter("com.crdroid.batterywellbeing.UPDATE_STATS"), Context.RECEIVER_EXPORTED)
+        context.registerReceiver(receiver, IntentFilter("com.crdroid.batterywellbeing.UPDATE_STATS"), "com.redwood.permission.SECURE_IPC", null, Context.RECEIVER_EXPORTED)
         onDispose { context.unregisterReceiver(receiver) }
     }
 

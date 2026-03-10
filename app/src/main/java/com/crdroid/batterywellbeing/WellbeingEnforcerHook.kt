@@ -45,7 +45,7 @@ object WellbeingEnforcerHook {
                                 context.registerReceiver(
                                     receiver,
                                     filter,
-                                    "android.permission.PACKAGE_USAGE_STATS",
+                                    "com.redwood.permission.SECURE_IPC",
                                     null,
                                     Context.RECEIVER_EXPORTED
                                 )

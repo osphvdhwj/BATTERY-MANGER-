@@ -58,7 +58,7 @@ class HeartbeatTrackerService : Service() {
 
         // Register receiver for native OS usage callbacks
         val filter = IntentFilter("com.crdroid.batterywellbeing.TIMER_BREACHED")
-        registerReceiver(timerReceiver, filter, Context.RECEIVER_EXPORTED)
+        registerReceiver(timerReceiver, filter, "com.redwood.permission.SECURE_IPC", null, Context.RECEIVER_EXPORTED)
 
         // Bootstrapping our event-driven observers
         registerAllAppObservers()

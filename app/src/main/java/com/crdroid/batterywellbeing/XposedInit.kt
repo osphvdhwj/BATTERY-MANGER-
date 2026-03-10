@@ -38,6 +38,7 @@ class XposedInit : IXposedHookLoadPackage {
         RogueAppHook.initHooks(lpparam.classLoader)
         StorageAbuseHook.initHooks(lpparam.classLoader)
         WellbeingEnforcerHook.initHooks(lpparam.classLoader)
+        CpusetManagerHook.initHooks(lpparam.classLoader)
         DisplayEngineHook.initHooks(lpparam.classLoader)
         ActivityInterceptorHook.initHooks(lpparam.classLoader)
 
@@ -111,7 +112,7 @@ class XposedInit : IXposedHookLoadPackage {
                                 filter.addAction("com.crdroid.batterywellbeing.UPDATE_SETTINGS")
                                 filter.addAction("com.crdroid.batterywellbeing.UPDATE_EXEMPTIONS")
                                 filter.addAction("com.crdroid.batterywellbeing.UPDATE_TIMERS")
-                                context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_EXPORTED)
+                                context.registerReceiver(receiver, filter, "com.redwood.permission.SECURE_IPC", null, android.content.Context.RECEIVER_EXPORTED)
                                 XposedHelpers.setAdditionalInstanceField(serviceInstance, "receiverRegistered", true)
                             }
 
