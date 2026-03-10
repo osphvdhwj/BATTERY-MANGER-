@@ -14,7 +14,7 @@ object FocusManager {
 
                 for (pkg in packagesToBlock) {
                     // This native command suspends the app, graying out its icon
-                    os.writeBytes("pm suspend --user 0 \$pkg \$state\n")
+                    os.writeBytes("pm suspend --user 0 $pkg $state\n")
                 }
 
                 os.writeBytes("exit\n")

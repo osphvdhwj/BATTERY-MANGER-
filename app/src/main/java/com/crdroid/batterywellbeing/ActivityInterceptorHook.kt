@@ -37,7 +37,7 @@ object ActivityInterceptorHook {
                         val restrictedApps = ModuleConfig.appTimeLimits.keys
 
                         if (restrictedApps.contains(targetPackage) && !intent.getBooleanExtra("friction_cleared", false)) {
-                            XposedBridge.log("BatteryWellbeing: Intercepted launch for \$targetPackage")
+                            XposedBridge.log("BatteryWellbeing: Intercepted launch for $targetPackage")
 
                             // Redirect to our Deep Breath Activity
                             val frictionIntent = Intent().apply {
@@ -52,7 +52,7 @@ object ActivityInterceptorHook {
                 }
             )
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing Interceptor Error: \${e.message}")
+            XposedBridge.log("BatteryWellbeing Interceptor Error: ${e.message}")
         }
     }
 }

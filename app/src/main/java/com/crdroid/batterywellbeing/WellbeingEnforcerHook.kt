@@ -30,11 +30,11 @@ object WellbeingEnforcerHook {
                                             val targetPackage = intent.getStringExtra("package_name") ?: return
 
                                             if (ModuleConfig.exemptedApps.contains(targetPackage)) {
-                                                XposedBridge.log("WellbeingEnforcer: Skipped kill order for exempted app -> \$targetPackage")
+                                                XposedBridge.log("WellbeingEnforcer: Skipped kill order for exempted app -> $targetPackage")
                                                 return
                                             }
 
-                                            XposedBridge.log("WellbeingEnforcer: Timer expired. Executing force-stop on -> \$targetPackage")
+                                            XposedBridge.log("WellbeingEnforcer: Timer expired. Executing force-stop on -> $targetPackage")
 
                                             executeKill(amsInstance, targetPackage, context)
                                         }
@@ -53,13 +53,13 @@ object WellbeingEnforcerHook {
                                 XposedBridge.log("BatteryWellbeing: Wellbeing Executioner is armed and ready.")
                             }
                         } catch (e: Exception) {
-                            XposedBridge.log("Redwood Enforcer Setup Error: \${e.message}")
+                            XposedBridge.log("Redwood Enforcer Setup Error: ${e.message}")
                         }
                     }
                 }
             )
         } catch (e: Exception) {
-            XposedBridge.log("Redwood Critical Enforcer Hook Failure: \${e.message}")
+            XposedBridge.log("Redwood Critical Enforcer Hook Failure: ${e.message}")
         }
     }
 
@@ -84,16 +84,16 @@ object WellbeingEnforcerHook {
                     }
                 }
                 method.invoke(amsInstance, *args)
-                XposedBridge.log("Redwood: Executioner dropped the hammer on \$targetPackage (OEM-Proofed)")
+                XposedBridge.log("Redwood: Executioner dropped the hammer on $targetPackage (OEM-Proofed)")
 
                 val appName = getAppName(context, targetPackage)
-                IslandDispatcher.dispatchSystemAlert(context, "EXECUTION_COMPLETE", "App Paused", "Time's up for \$appName.", "#2196F3")
+                IslandDispatcher.dispatchSystemAlert(context, "EXECUTION_COMPLETE", "App Paused", "Time's up for $appName.", "#2196F3")
 
             } else {
                 XposedBridge.log("Redwood: CRITICAL - forceStopPackage method not found in AMS!")
             }
         } catch (e: Exception) {
-            XposedBridge.log("Redwood Executioner Failed: \${e.message}")
+            XposedBridge.log("Redwood Executioner Failed: ${e.message}")
         }
     }
 

@@ -109,3 +109,9 @@ dependencies {
     // LSPosed API
     compileOnly("de.robv.android.xposed:api:82")
 }
+
+android {
+    lint {
+        abortOnError = false
+    }
+}

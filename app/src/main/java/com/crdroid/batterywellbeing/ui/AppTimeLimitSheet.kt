@@ -5,15 +5,21 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import org.json.JSONObject
 
@@ -34,7 +40,6 @@ fun AppTimeLimitSheet(
     var apps by remember { mutableStateOf<List<AppTimerItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Mutable state for the currently active timers being configured in the sheet
     val currentTimers = remember { mutableStateMapOf<String, Long>().apply { putAll(existingTimers) } }
 
     LaunchedEffect(Unit) {
@@ -50,7 +55,6 @@ fun AppTimeLimitSheet(
             )
         }
 
-        // Group by active vs inactive, then sort alphabetically
         val active = userApps.filter { activePackagesToday.contains(it.packageName) }.sortedBy { it.label }
         val inactive = userApps.filter { !activePackagesToday.contains(it.packageName) }.sortedBy { it.label }
 
@@ -60,17 +64,19 @@ fun AppTimeLimitSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color(0xFF0F0F0F), // True Black AMOLED Base
+        scrimColor = Color.Black.copy(alpha = 0.8f)
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.9f)) {
-            Text("App Time Limits", style = MaterialTheme.typography.titleLarge)
+            Text("RESTRICT APP TIME", color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = 1.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Set daily screen time quotas. Apps exceeding this will be forcefully stopped if Strict App Timers are enabled.", style = MaterialTheme.typography.bodyMedium)
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("Terminate heavy drainers automatically.", color = Color(0xFFA0A0A0), fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (isLoading) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = Color(0xFF00E5FF))
                 }
             } else {
                 LazyColumn(modifier = Modifier.weight(1f)) {
@@ -79,58 +85,37 @@ fun AppTimeLimitSheet(
                     items(apps) { app ->
                         val isActive = activePackagesToday.contains(app.packageName)
                         if (isActive && apps.indexOf(app) == 0) {
-                            Text("Active Today", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("ACTIVE TODAY", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp, modifier = Modifier.padding(vertical = 12.dp))
                         } else if (!isActive && previousWasActive) {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("All Apps", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("ALL APPS", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp, modifier = Modifier.padding(vertical = 12.dp))
                             previousWasActive = false
                         }
 
                         val limitMs = currentTimers[app.packageName] ?: 0L
                         val limitMinutes = limitMs / (60 * 1000)
 
-                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Image(
-                                    painter = rememberDrawablePainter(app.icon),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(40.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(app.label, style = MaterialTheme.typography.bodyLarge)
-                                    Text(if (limitMinutes > 0) "\$limitMinutes minutes" else "No Limit", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Image(painter = rememberDrawablePainter(app.icon), contentDescription = null, modifier = Modifier.size(40.dp))
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(app.label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text(if (limitMinutes > 0) "$limitMinutes min limit" else "No Limit", color = if (limitMinutes > 0) Color(0xFF00E5FF) else Color(0xFF666666), fontSize = 13.sp)
+                                    }
                                 }
-                            }
 
-                            // Zero-Friction Input Row (FilterChips)
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = limitMinutes == 15L,
-                                    onClick = { currentTimers[app.packageName] = 15 * 60 * 1000L },
-                                    label = { Text("15 Min") }
-                                )
-                                FilterChip(
-                                    selected = limitMinutes == 30L,
-                                    onClick = { currentTimers[app.packageName] = 30 * 60 * 1000L },
-                                    label = { Text("30 Min") }
-                                )
-                                FilterChip(
-                                    selected = limitMinutes == 60L,
-                                    onClick = { currentTimers[app.packageName] = 60 * 60 * 1000L },
-                                    label = { Text("1 Hour") }
-                                )
-                                FilterChip(
-                                    selected = limitMinutes == 0L,
-                                    onClick = { currentTimers.remove(app.packageName) },
-                                    label = { Text("None") }
-                                )
+                                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TimeLimitChip("15m", limitMinutes == 15L) { currentTimers[app.packageName] = 15 * 60 * 1000L }
+                                    TimeLimitChip("30m", limitMinutes == 30L) { currentTimers[app.packageName] = 30 * 60 * 1000L }
+                                    TimeLimitChip("1h", limitMinutes == 60L) { currentTimers[app.packageName] = 60 * 60 * 1000L }
+                                    TimeLimitChip("None", limitMinutes == 0L) { currentTimers.remove(app.packageName) }
+                                }
                             }
                         }
                     }
@@ -139,39 +124,43 @@ fun AppTimeLimitSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {
-                    dispatchTimersToBackend(context, currentTimers.toMap())
-                    onDismiss()
-                }) {
-                    Text("Save & Apply")
+                TextButton(onClick = onDismiss) { Text("CANCEL", color = Color(0xFFA0A0A0)) }
+                Spacer(modifier = Modifier.width(16.dp))
+                Button(onClick = { dispatchTimersToBackend(context, currentTimers.toMap()); onDismiss() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))) {
+                    Text("APPLY", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 }
 
+@Composable
+fun RowScope.TimeLimitChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .background(
+                color = if (selected) Color(0xFF00E5FF).copy(alpha = 0.2f) else Color(0xFF222222),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(vertical = 8.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (selected) Color(0xFF00E5FF) else Color.White, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+    }
+}
+
 private fun dispatchTimersToBackend(context: Context, timers: Map<String, Long>) {
     try {
         val jsonPayload = JSONObject()
-        timers.forEach { (pkg, ms) ->
-            if (ms > 0) jsonPayload.put(pkg, ms)
-        }
+        timers.forEach { (pkg, ms) -> if (ms > 0) jsonPayload.put(pkg, ms) }
         val jsonString = jsonPayload.toString()
 
-        // Save to SharedPreferences for BootAnchorReceiver using correct prefs name
         val prefs = context.getSharedPreferences("BatteryWellbeingPrefs", Context.MODE_PRIVATE)
         prefs.edit().putString("app_timers_json", jsonString).apply()
 
-        // Broadcast to system_server
-        val intent = Intent("com.crdroid.batterywellbeing.UPDATE_TIMERS").apply {
-            putExtra("timers_payload", jsonString)
-        }
+        val intent = Intent("com.crdroid.batterywellbeing.UPDATE_TIMERS").apply { putExtra("timers_payload", jsonString) }
         context.sendBroadcast(intent, "com.redwood.permission.SECURE_IPC")
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
+    } catch (e: Exception) { e.printStackTrace() }
 }

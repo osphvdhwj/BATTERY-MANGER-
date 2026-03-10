@@ -38,7 +38,7 @@ object DisplayEngineHook {
                                 attributes.preferredRefreshRate = 60.0f
 
                                 XposedHelpers.callMethod(param.thisObject, "setAttributes", attributes)
-                                XposedBridge.log("BatteryWellbeing: DisplayEngine capped \$packageName to 60Hz.")
+                                XposedBridge.log("BatteryWellbeing: DisplayEngine capped $packageName to 60Hz.")
                             }
                         } catch (e: Exception) {
                             // Silently fail to avoid UI rendering crashes
@@ -48,7 +48,7 @@ object DisplayEngineHook {
             )
             XposedBridge.log("BatteryWellbeing: Display Override Engine armed.")
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing DisplayEngine Hook Failure: \${e.message}")
+            XposedBridge.log("BatteryWellbeing DisplayEngine Hook Failure: ${e.message}")
         }
     }
 }

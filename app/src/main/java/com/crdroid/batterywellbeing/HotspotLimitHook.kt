@@ -47,7 +47,7 @@ object HotspotLimitHook {
                                 if (!activeClients.containsKey(macString)) {
                                     activeClients[macString] = 0L
                                     // injectIptablesRule(macString) // Deprecated: Replaced by future eBPF
-                                    XposedBridge.log("BatteryWellbeing: New Hotspot Client -> \$macString. Tracking started.")
+                                    XposedBridge.log("BatteryWellbeing: New Hotspot Client -> $macString. Tracking started.")
                                 }
                             }
 
@@ -55,7 +55,7 @@ object HotspotLimitHook {
                             activeClients.keys.retainAll(currentMacs)
 
                         } catch (e: Exception) {
-                            XposedBridge.log("BatteryWellbeing Hotspot Hook Error: \${e.message}")
+                            XposedBridge.log("BatteryWellbeing Hotspot Hook Error: ${e.message}")
                         }
                     }
                 }
@@ -67,13 +67,13 @@ object HotspotLimitHook {
             XposedBridge.log("BatteryWellbeing: Hotspot Per-Connection Limits Engaged.")
 
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing Critical Hotspot Hook Failure: \${e.message}")
+            XposedBridge.log("BatteryWellbeing Critical Hotspot Hook Failure: ${e.message}")
         }
     }
 
     private fun injectIptablesRule(macAddress: String) {
         // Inject an accounting rule that simply returns, incrementing the byte counter
-        executeShellCommand("iptables -I tetherctrl_FORWARD -m mac --mac-source \$macAddress -j RETURN")
+        executeShellCommand("iptables -I tetherctrl_FORWARD -m mac --mac-source $macAddress -j RETURN")
     }
 
     private fun startDataPollingThread() {

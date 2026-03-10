@@ -56,7 +56,7 @@ object StorageAbuseHook {
                                             val appName = getAppName(context, packages[0])
                                             val formattedWrite = formatBytes(bgBytesWrite)
 
-                                            XposedBridge.log("BatteryWellbeing: STORAGE ABUSE -> \$appName wrote \$formattedWrite in background!")
+                                            XposedBridge.log("BatteryWellbeing: STORAGE ABUSE -> $appName wrote $formattedWrite in background!")
 
                                             // Fire to Dynamic Island
                                             if (ModuleConfig.enableStorageAbuse) {
@@ -72,14 +72,14 @@ object StorageAbuseHook {
                             XposedHelpers.callMethod(readerInstance, "readAbsolute", callbackProxy)
 
                         } catch (e: Exception) {
-                            XposedBridge.log("BatteryWellbeing StorageAbuse Read Error: \${e.message}")
+                            XposedBridge.log("BatteryWellbeing StorageAbuse Read Error: ${e.message}")
                         }
                     }
                 }
             )
             XposedBridge.log("BatteryWellbeing: Storage Abuse tracking engaged.")
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing Critical Storage Hook Failure: \${e.message}")
+            XposedBridge.log("BatteryWellbeing Critical Storage Hook Failure: ${e.message}")
         }
     }
 

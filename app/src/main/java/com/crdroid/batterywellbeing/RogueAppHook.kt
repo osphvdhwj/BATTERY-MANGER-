@@ -24,10 +24,10 @@ object RogueAppHook {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         try {
                             val packageName = param.args[0] as String
-                            XposedBridge.log("BatteryWellbeing: Rogue app notification intercepted for -> \$packageName")
+                            XposedBridge.log("BatteryWellbeing: Rogue app notification intercepted for -> $packageName")
 
                             // Retrieve the system_server Context to fire our Island broadcast
-                            // NotificationHelper is usually an inner class, so we grab the outer AppRestrictionController's context
+                            // com.crdroid.batterywellbeing.utils.NotificationHelper is usually an inner class, so we grab the outer AppRestrictionController's context
                             val appRestrictionController = XposedHelpers.getObjectField(param.thisObject, "this$0")
                             val context = XposedHelpers.getObjectField(appRestrictionController, "mContext") as Context
 
@@ -45,7 +45,7 @@ object RogueAppHook {
                             param.result = null
 
                         } catch (e: Exception) {
-                            XposedBridge.log("BatteryWellbeing RogueApp Hook Error: \${e.message}")
+                            XposedBridge.log("BatteryWellbeing RogueApp Hook Error: ${e.message}")
                         }
                     }
                 }
@@ -73,7 +73,7 @@ object RogueAppHook {
                             val packageName = XposedHelpers.getObjectField(processInfo, "packageName") as String
                             val killReasonMsg = param.args[4] as String
 
-                            XposedBridge.log("BatteryWellbeing: Killed phantom process -> \$packageName (\$killReasonMsg)")
+                            XposedBridge.log("BatteryWellbeing: Killed phantom process -> $packageName ($killReasonMsg)")
 
                             // Grab context via Android's internal ActivityThread for system_server
                             val activityThreadClass = XposedHelpers.findClass("android.app.ActivityThread", classLoader)
@@ -84,11 +84,11 @@ object RogueAppHook {
 
                             // Fire to the Island with the reason
                             if (ModuleConfig.enableRogueApp) {
-                                IslandDispatcher.dispatchSystemAlert(context, "ROGUE_APP_DETECTED", "Phantom Processes Killed", "\$appName spawned abusive phantom threads.", "#FF9800")
+                                IslandDispatcher.dispatchSystemAlert(context, "ROGUE_APP_DETECTED", "Phantom Processes Killed", "$appName spawned abusive phantom threads.", "#FF9800")
                             }
 
                         } catch (e: Exception) {
-                            XposedBridge.log("BatteryWellbeing PhantomProcess Hook Error: \${e.message}")
+                            XposedBridge.log("BatteryWellbeing PhantomProcess Hook Error: ${e.message}")
                         }
                     }
                 }
@@ -97,7 +97,7 @@ object RogueAppHook {
             XposedBridge.log("BatteryWellbeing: Rogue App Detection hooks applied successfully.")
 
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing Critical Rogue Hook Failure: \${e.message}")
+            XposedBridge.log("BatteryWellbeing Critical Rogue Hook Failure: ${e.message}")
         }
     }
 

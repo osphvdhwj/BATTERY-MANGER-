@@ -93,7 +93,7 @@ class RealityPillService : Service(), LifecycleOwner, SavedStateRegistryOwner {
                 }
 
                 val minutes = sessionSeconds / 60
-                val displayTime = if (minutes > 0) "\${minutes}m" else "\${sessionSeconds}s"
+                val displayTime = if (minutes > 0) "${minutes}m" else "${sessionSeconds}s"
 
                 Box(
                     modifier = Modifier
@@ -101,7 +101,7 @@ class RealityPillService : Service(), LifecycleOwner, SavedStateRegistryOwner {
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Session: \$displayTime", color = textColor, fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    Text("Session: $displayTime", color = textColor, fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                 }
             }
         }

@@ -135,21 +135,21 @@ class XposedInit : IXposedHookLoadPackage {
                             // Thermal Throttling Warning (Over 42°C)
                             val thermalLimit = ModuleConfig.thermalWarningThresholdC
                             if (ModuleConfig.enableThermalWarnings && batteryTemp >= thermalLimit && batteryTemp != lastNotifiedTemp) {
-                                IslandDispatcher.dispatchSystemAlert(context, "THERMAL_WARNING", "Thermal Alert", "Battery is running hot at \$batteryTemp°C.", "#F44336")
+                                IslandDispatcher.dispatchSystemAlert(context, "THERMAL_WARNING", "Thermal Alert", "Battery is running hot at $batteryTemp°C.", "#F44336")
                                 lastNotifiedTemp = batteryTemp
                             } else if (batteryTemp < thermalLimit - 2) {
                                 lastNotifiedTemp = 0 // Reset when cooled down
                             }
 
                         } catch (e: Exception) {
-                            XposedBridge.log("BatteryWellbeing Island Hook Error: \${e.message}")
+                            XposedBridge.log("BatteryWellbeing Island Hook Error: ${e.message}")
                         }
                     }
                 }
             )
             XposedBridge.log("BatteryWellbeing: Successfully hooked system_server BatteryService")
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing system_server hook failed: \${e.message}")
+            XposedBridge.log("BatteryWellbeing system_server hook failed: ${e.message}")
         }
     }
 
@@ -190,13 +190,13 @@ class XposedInit : IXposedHookLoadPackage {
                                 context.sendBroadcast(intent)
                             }
                         } catch (e: Exception) {
-                            XposedBridge.log("BatteryWellbeing Dashboard Hook Error: \${e.message}")
+                            XposedBridge.log("BatteryWellbeing Dashboard Hook Error: ${e.message}")
                         }
                     }
                 }
             )
         } catch (e: Exception) {
-            XposedBridge.log("BatteryWellbeing UI Hook Error: \${e.message}")
+            XposedBridge.log("BatteryWellbeing UI Hook Error: ${e.message}")
         }
     }
 }
