@@ -3,7 +3,7 @@ name: Build Micro-Debug APK
 # Trigger the build on pushes to the main branch or manually via the Actions tab
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "refs/heads/jules-battery-wellbeing-module-6203023150776826978", "master" ]
   workflow_dispatch:
 
 jobs:
