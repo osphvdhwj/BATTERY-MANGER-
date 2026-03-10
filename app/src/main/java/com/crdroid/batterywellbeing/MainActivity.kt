@@ -233,7 +233,8 @@ class MainActivity : ComponentActivity() {
 
                         com.crdroid.batterywellbeing.ui.AppTimeLimitSheet(
                             onDismiss = { showTimeLimitSheet = false },
-                            existingTimers = existingTimers
+                            existingTimers = existingTimers,
+                            activePackagesToday = getDailyScreenTime(this@MainActivity).filter { it.value > 0 }.keys
                         )
                     }
                 }

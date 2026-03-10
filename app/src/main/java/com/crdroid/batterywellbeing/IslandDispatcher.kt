@@ -29,11 +29,12 @@ object IslandDispatcher {
         context.sendBroadcast(intent, SECURE_PERMISSION)
     }
 
-    fun dispatchRealityTick(context: Context, appName: String, sessionMinutes: Int) {
+    fun dispatchRealityTick(context: Context, appName: String, sessionMinutes: Int, colorHex: String) {
         val intent = Intent("com.crdroid.batterywellbeing.REALITY_PILL_TICK").apply {
             setPackage(ISLAND_PACKAGE)
             putExtra("app_name", appName)
             putExtra("session_minutes", sessionMinutes)
+            putExtra("colorHex", colorHex)
         }
         context.sendBroadcast(intent, SECURE_PERMISSION)
     }

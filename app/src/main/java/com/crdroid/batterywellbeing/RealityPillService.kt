@@ -79,6 +79,16 @@ class RealityPillService : Service(), LifecycleOwner, SavedStateRegistryOwner {
                     while (true) {
                         delay(1000)
                         sessionSeconds++
+
+                        // Anti-Desensitization Logic
+                        if (sessionSeconds % 60 == 0) {
+                            val sessionMinutes = sessionSeconds / 60
+                            when (sessionMinutes) {
+                                15, 30 -> IslandDispatcher.dispatchRealityTick(this@RealityPillService, "Current Session", sessionMinutes, "#FFFFFF")
+                                45, 55 -> IslandDispatcher.dispatchRealityTick(this@RealityPillService, "Current Session", sessionMinutes, "#FFA500")
+                                59 -> IslandDispatcher.dispatchRealityTick(this@RealityPillService, "Current Session", sessionMinutes, "#FF0000")
+                            }
+                        }
                     }
                 }
 

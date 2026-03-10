@@ -27,7 +27,8 @@ data class AppTimerItem(
 @Composable
 fun AppTimeLimitSheet(
     onDismiss: () -> Unit,
-    existingTimers: Map<String, Long>
+    existingTimers: Map<String, Long>,
+    activePackagesToday: Set<String>
 ) {
     val context = LocalContext.current
     var apps by remember { mutableStateOf<List<AppTimerItem>>(emptyList()) }
@@ -47,9 +48,13 @@ fun AppTimeLimitSheet(
                 label = pm.getApplicationLabel(it).toString(),
                 icon = pm.getApplicationIcon(it)
             )
-        }.sortedBy { it.label }
+        }
 
-        apps = userApps
+        // Group by active vs inactive, then sort alphabetically
+        val active = userApps.filter { activePackagesToday.contains(it.packageName) }.sortedBy { it.label }
+        val inactive = userApps.filter { !activePackagesToday.contains(it.packageName) }.sortedBy { it.label }
+
+        apps = active + inactive
         isLoading = false
     }
 
@@ -69,38 +74,63 @@ fun AppTimeLimitSheet(
                 }
             } else {
                 LazyColumn(modifier = Modifier.weight(1f)) {
+                    var previousWasActive = true
+
                     items(apps) { app ->
+                        val isActive = activePackagesToday.contains(app.packageName)
+                        if (isActive && apps.indexOf(app) == 0) {
+                            Text("Active Today", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(vertical = 8.dp))
+                        } else if (!isActive && previousWasActive) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("All Apps", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(vertical = 8.dp))
+                            previousWasActive = false
+                        }
+
                         val limitMs = currentTimers[app.packageName] ?: 0L
                         val limitMinutes = limitMs / (60 * 1000)
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Image(
-                                painter = rememberDrawablePainter(app.icon),
-                                contentDescription = null,
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(app.label, style = MaterialTheme.typography.bodyLarge)
-                                Text(if (limitMinutes > 0) "\$limitMinutes minutes" else "No Limit", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Image(
+                                    painter = rememberDrawablePainter(app.icon),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(app.label, style = MaterialTheme.typography.bodyLarge)
+                                    Text(if (limitMinutes > 0) "\$limitMinutes minutes" else "No Limit", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                                }
                             }
 
-                            // Simple quick-add minutes button for demo/functional purposes
-                            Row {
-                                IconButton(onClick = {
-                                    if (limitMinutes >= 15) currentTimers[app.packageName] = (limitMinutes - 15) * 60 * 1000
-                                    else currentTimers.remove(app.packageName)
-                                }) {
-                                    Text("-", style = MaterialTheme.typography.titleLarge)
-                                }
-                                IconButton(onClick = {
-                                    currentTimers[app.packageName] = (limitMinutes + 15) * 60 * 1000
-                                }) {
-                                    Text("+", style = MaterialTheme.typography.titleLarge)
-                                }
+                            // Zero-Friction Input Row (FilterChips)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = limitMinutes == 15L,
+                                    onClick = { currentTimers[app.packageName] = 15 * 60 * 1000L },
+                                    label = { Text("15 Min") }
+                                )
+                                FilterChip(
+                                    selected = limitMinutes == 30L,
+                                    onClick = { currentTimers[app.packageName] = 30 * 60 * 1000L },
+                                    label = { Text("30 Min") }
+                                )
+                                FilterChip(
+                                    selected = limitMinutes == 60L,
+                                    onClick = { currentTimers[app.packageName] = 60 * 60 * 1000L },
+                                    label = { Text("1 Hour") }
+                                )
+                                FilterChip(
+                                    selected = limitMinutes == 0L,
+                                    onClick = { currentTimers.remove(app.packageName) },
+                                    label = { Text("None") }
+                                )
                             }
                         }
                     }
@@ -140,7 +170,7 @@ private fun dispatchTimersToBackend(context: Context, timers: Map<String, Long>)
         val intent = Intent("com.crdroid.batterywellbeing.UPDATE_TIMERS").apply {
             putExtra("timers_payload", jsonString)
         }
-        context.sendBroadcast(intent)
+        context.sendBroadcast(intent, "com.redwood.permission.SECURE_IPC")
     } catch (e: Exception) {
         e.printStackTrace()
     }

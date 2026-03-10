@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
@@ -91,18 +92,28 @@ class InterstitialShieldService : Service(), LifecycleOwner, SavedStateRegistryO
 
     @Composable
     fun InterstitialScreen(appName: String, targetPackage: String) {
-        var countdown by remember { mutableIntStateOf(5) }
+        val alpha = remember { androidx.compose.animation.core.Animatable(0f) }
 
         LaunchedEffect(Unit) {
-            while (countdown > 0) {
-                delay(1000)
-                countdown--
-            }
-            // Time is up. Drop the hammer via system_server.
+            // 1.5 second fade in to thick glass
+            alpha.animateTo(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearOutSlowInEasing)
+            )
+
+            // Time is up. Drop the hammer via system_server securely.
             val killIntent = Intent("com.crdroid.batterywellbeing.EXECUTE_KILL").apply {
                 putExtra("package_name", targetPackage)
             }
-            sendBroadcast(killIntent)
+            sendBroadcast(killIntent, "com.redwood.permission.SECURE_IPC")
+
+            // Wait 1 second after the kill, then fade out
+            delay(1000)
+
+            alpha.animateTo(
+                targetValue = 0f,
+                animationSpec = androidx.compose.animation.core.tween(500)
+            )
 
             // Clean up the overlay
             stopSelf()
@@ -111,18 +122,16 @@ class InterstitialShieldService : Service(), LifecycleOwner, SavedStateRegistryO
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xE6000000)) // 90% opaque black for dramatic effect
+                .background(Color(0xFF000000).copy(alpha = alpha.value * 0.95f)) // Deep black fade
                 .padding(32.dp),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Time's Up", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("You have reached your daily limit for \$appName.", color = Color.LightGray, fontSize = 18.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Spacer(modifier = Modifier.height(48.dp))
-                Text(countdown.toString(), color = Color(0xFF0A84FF), fontSize = 72.sp, fontWeight = FontWeight.Black)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.alpha(alpha.value)) {
+                Text("🔒", fontSize = 80.sp)
                 Spacer(modifier = Modifier.height(24.dp))
-                Text("Taking a breath...", color = Color.Gray, fontSize = 14.sp)
+                Text("Session Complete", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Your time limit for $appName has been reached.", color = Color.LightGray, fontSize = 18.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
