@@ -1,5 +1,8 @@
 package com.crdroid.batterywellbeing
 
+import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
+
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
@@ -57,7 +60,28 @@ data class BatteryStat(
     var mobileBytes: Long = 0L
 )
 
+
+
+fun getAppIcon(context: Context, packageName: String): Drawable? {
+    return try {
+        context.packageManager.getApplicationIcon(packageName)
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    }
+}
+
 // Helpers
+// Helper function to extract the real app name
+fun getAppName(context: Context, packageName: String): String {
+    val pm = context.packageManager
+    return try {
+        val appInfo = pm.getApplicationInfo(packageName, 0)
+        pm.getApplicationLabel(appInfo).toString()
+    } catch (e: Exception) {
+        packageName // Fallback to package name if it fails
+    }
+}
+
 fun hasUsageStatsPermission(context: Context): Boolean {
     val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     val mode = appOps.unsafeCheckOpNoThrow(
@@ -352,8 +376,8 @@ fun WellbeingDashboardHost(prefs: SharedPreferences, onActionClick: (String) -> 
 
         AppUsageItem(
             packageName = pkgName,
-            name = pkgName, // In reality, resolve with getAppName
-            iconUrl = pkgName,
+            name = getAppName(context, pkgName),
+            iconUrl = getAppIcon(context, pkgName) ?: pkgName,
             screenTimeMs = stat.screenTimeMs,
             batteryDrainMah = stat.value1.toInt(),
             is60HzCapped = setOf("com.instagram.android", "com.zhiliaoapp.musically", "com.twitter.android").contains(pkgName),

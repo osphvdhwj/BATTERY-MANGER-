@@ -104,7 +104,9 @@ fun NeonHeroRing(totalTimeMs: Long, goalTimeMs: Long) {
 
     val minutes = (totalTimeMs / (1000 * 60)) % 60
     val hours = (totalTimeMs / (1000 * 60 * 60))
-    val timeString = if (hours > 0) "\${hours}h \${minutes}m" else "\${minutes}m"
+
+    // 🚀 FIX: Ensure there are NO backslashes before the dollar signs here!
+    val timeString = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(Color(0xFF00E5FF), Color(0xFF007BFF))
@@ -117,7 +119,6 @@ fun NeonHeroRing(totalTimeMs: Long, goalTimeMs: Long) {
         Canvas(modifier = Modifier.size(260.dp)) {
             val strokeWidth = 28.dp.toPx()
 
-            // Dark track
             drawArc(
                 color = Color(0xFF151515),
                 startAngle = 0f,
@@ -126,7 +127,6 @@ fun NeonHeroRing(totalTimeMs: Long, goalTimeMs: Long) {
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
 
-            // Neon Gradient Progress
             drawArc(
                 brush = gradientBrush,
                 startAngle = -90f,
@@ -137,9 +137,10 @@ fun NeonHeroRing(totalTimeMs: Long, goalTimeMs: Long) {
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(timeString, color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Black)
+            // The timeString variable is passed directly to the Text component
+            Text(text = timeString, color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Black)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("SCREEN TIME", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Text(text = "SCREEN TIME", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
         }
     }
 }
@@ -148,22 +149,14 @@ fun NeonHeroRing(totalTimeMs: Long, goalTimeMs: Long) {
 fun GlassAppRow(app: AppUsageItem) {
     val minutes = (app.screenTimeMs / (1000 * 60)) % 60
     val hours = (app.screenTimeMs / (1000 * 60 * 60))
-    val timeStr = if (hours > 0) "\${hours}h \${minutes}m" else "\${minutes}m"
 
-    // Inside AppUsageRow in WellbeingDashboardScreen.kt
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val iconDrawable = remember(app.packageName) {
-        try {
-            context.packageManager.getApplicationIcon(app.packageName)
-        } catch (e: Exception) {
-            null
-        }
-    }
+    // 🚀 FIX: Standard string interpolation
+    val timeStr = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)), // Dark Glass
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)), // Subtle reflection edge
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
         shape = RoundedCornerShape(20.dp)
     ) {
         Row(
@@ -171,18 +164,22 @@ fun GlassAppRow(app: AppUsageItem) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = iconDrawable, // Pass the native Android Drawable to Coil
-                contentDescription = "\${app.name} icon",
+                model = app.iconUrl,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(48.dp).clip(CircleShape)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(app.name, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                // 🚀 FIX: Fallback to package name ONLY if app.name is blank
+                val displayName = app.name.ifBlank { app.packageName }
+                Text(text = displayName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("⏱ \$timeStr", color = Color(0xFFA0A0A0), fontSize = 13.sp)
-                    Text("🔋 \${app.batteryDrainMah} mAh", color = Color(0xFFA0A0A0), fontSize = 13.sp)
+                    // 🚀 FIX: Standard string interpolation for the stats
+                    Text(text = "⏱ $timeStr", color = Color(0xFFA0A0A0), fontSize = 13.sp)
+                    Text(text = "🔋 ${app.batteryDrainMah} mAh", color = Color(0xFFA0A0A0), fontSize = 13.sp)
                 }
             }
         }
