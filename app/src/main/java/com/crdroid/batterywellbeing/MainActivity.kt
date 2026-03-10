@@ -69,15 +69,19 @@ class MainActivity : ComponentActivity() {
             BatteryWellbeingTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
                     var showSettings by remember { mutableStateOf(false) }
+                    var showHardware by remember { mutableStateOf(false) }
                     var showExemptions by remember { mutableStateOf(false) }
                     var showTimeLimitSheet by remember { mutableStateOf(false) }
 
-                    if (showSettings) {
+                    if (showHardware) {
+                        com.crdroid.batterywellbeing.ui.CpuMonitorScreen(onNavigateBack = { showHardware = false })
+                    } else if (showSettings) {
                         SettingsScreen(prefs, this@MainActivity, { showSettings = false }, { showExemptions = true }, { showTimeLimitSheet = true })
                     } else {
                         WellbeingDashboardHost(prefs) { action ->
                             when (action) {
                                 "Configure App Timers", "Manage Hotspot Limits", "Thermal Settings", "Settings" -> showSettings = true
+                                "Hardware" -> showHardware = true
                                 "Exemptions" -> showExemptions = true
                             }
                         }

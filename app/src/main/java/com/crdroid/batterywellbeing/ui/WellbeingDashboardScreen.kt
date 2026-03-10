@@ -189,6 +189,14 @@ fun GlassAppRow(app: AppUsageItem) {
 @Composable
 fun GlassActionGrid(onActionClick: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+GlassActionCard(
+            title = "Live Hardware Telemetry",
+            icon = "⚙️",
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        ) {
+            onActionClick("Hardware")
+        }
+
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GlassActionCard("App Timers", "⏳", Modifier.weight(1f)) { onActionClick("Configure App Timers") }
             GlassActionCard("Network Quotas", "📡", Modifier.weight(1f)) { onActionClick("Manage Hotspot Limits") }
