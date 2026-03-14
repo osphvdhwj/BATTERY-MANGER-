@@ -17,6 +17,7 @@ class XposedInit : IXposedHookLoadPackage {
         // 1. Hook the System Server for Persistent Background Island Triggers
         if (lpparam.packageName == "android") {
             hookBatteryServiceForIsland(lpparam)
+            TournamentModeHook.initHooks(lpparam.classLoader)
             return
         }
 
