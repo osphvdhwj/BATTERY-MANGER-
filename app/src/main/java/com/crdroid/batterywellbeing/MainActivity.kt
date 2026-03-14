@@ -78,7 +78,7 @@ fun WellbeingNavGraph(navController: NavHostController, prefs: SharedPreferences
     NavHost(navController = navController, startDestination = "dashboard", modifier = modifier) {
         composable("dashboard") { RealTimeDashboardScreen(navController) }
         composable("telemetry") { CpuMonitorScreen(onNavigateBack = { navController.navigateUp() }) }
-        composable("executioner") { ExecutionerScreen(prefs) }
+        composable("executioner") { ProfileMatrixScreen() }
         composable("shield") { ShieldSettingsScreen(prefs, LocalContext.current) }
     }
 }
