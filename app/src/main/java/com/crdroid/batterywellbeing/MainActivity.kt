@@ -23,6 +23,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.platform.LocalContext
 import com.crdroid.batterywellbeing.ui.*
 import com.crdroid.batterywellbeing.ui.theme.BatteryWellbeingTheme
 import java.util.Calendar
