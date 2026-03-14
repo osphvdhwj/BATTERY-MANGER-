@@ -39,6 +39,13 @@ object IslandDispatcher {
         context.sendBroadcast(intent, SECURE_PERMISSION)
     }
 
+    fun dispatchCpuPinningSync(context: Context, throttledApps: Set<String>) {
+        val intent = Intent("com.crdroid.batterywellbeing.SYNC_CPU_PINNING").apply {
+            putExtra("throttled_apps_csv", throttledApps.joinToString(","))
+        }
+        context.sendBroadcast(intent, SECURE_PERMISSION)
+    }
+
     fun dispatchConfigSync(context: Context, timers: Map<String, Long>, exemptedApps: Set<String>) {
         val jsonPayload = JSONObject()
         timers.forEach { (pkg, ms) -> jsonPayload.put(pkg, ms) }
